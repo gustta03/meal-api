@@ -72,14 +72,14 @@ src/
 
 ## Funcionalidades
 
-- ✅ CRUD completo de alimentos
-- ✅ Validação de dados com TypeBox
-- ✅ Tratamento de erros centralizado
-- ✅ Documentação automática com Swagger
-- ✅ Health check endpoint
-- ✅ Desacoplamento total de framework (controllers independentes)
-- ✅ Injeção de dependências centralizada
-- ✅ Suporte a MongoDB
+- CRUD completo de alimentos
+- Validação de dados com TypeBox
+- Tratamento de erros centralizado
+- Documentação automática com Swagger
+- Health check endpoint
+- Desacoplamento total de framework (controllers independentes)
+- Injeção de dependências centralizada
+- Suporte a MongoDB
 
 ## Instalação
 
