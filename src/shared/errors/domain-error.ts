@@ -1,6 +1,3 @@
-/**
- * Classe base para erros de domínio
- */
 export abstract class DomainError extends Error {
   abstract readonly code: string;
 

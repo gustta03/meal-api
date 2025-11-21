@@ -1,7 +1,3 @@
-/**
- * Result type para tratamento de erros sem exceções
- * Seguindo princípios de Clean Code e programação funcional
- */
 export type Result<T, E = Error> =
   | { success: true; data: T }
   | { success: false; error: E };
