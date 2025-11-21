@@ -2,11 +2,11 @@
 
 API REST para gerenciamento de alimentos e informações nutricionais, construída com **Bun** e **Elysia**, seguindo os princípios de **Clean Architecture** e **Clean Code**.
 
-## 📋 Sobre o Projeto
+## Sobre o Projeto
 
 API desenvolvida para cadastro e consulta de alimentos com informações nutricionais detalhadas (calorias, proteínas, carboidratos e gorduras). Este projeto serve como exemplo de implementação de arquitetura limpa, com separação clara de responsabilidades e boas práticas de desenvolvimento.
 
-## 🚀 Tecnologias
+## Tecnologias
 
 - **Runtime**: [Bun](https://bun.sh/) - Runtime JavaScript/TypeScript de alta performance
 - **Framework**: [Elysia](https://elysiajs.com/) - Framework web minimalista e rápido
@@ -15,7 +15,7 @@ API desenvolvida para cadastro e consulta de alimentos com informações nutrici
 - **Validação**: TypeBox - Validação de schemas
 - **Documentação**: Swagger/OpenAPI - Documentação automática da API
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 O projeto segue os princípios de **Clean Architecture** com 4 camadas bem definidas:
 
@@ -40,7 +40,7 @@ O projeto segue os princípios de **Clean Architecture** com 4 camadas bem defin
 - Adapters para Elysia
 - Middlewares
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
 ```
 src/
@@ -70,7 +70,7 @@ src/
     └── utils/               # Utilitários
 ```
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 - ✅ CRUD completo de alimentos
 - ✅ Validação de dados com TypeBox
@@ -81,7 +81,7 @@ src/
 - ✅ Injeção de dependências centralizada
 - ✅ Suporte a MongoDB
 
-## 🛠️ Instalação
+## Instalação
 
 ### Pré-requisitos
 
@@ -118,7 +118,7 @@ bun run dev
 bun run start
 ```
 
-## 📚 Endpoints
+## Endpoints
 
 ### Alimentos
 
@@ -183,7 +183,7 @@ curl -X PUT http://localhost:3000/foods/{id} \
 curl -X DELETE http://localhost:3000/foods/{id}
 ```
 
-## 🎯 Princípios Aplicados
+## Princípios Aplicados
 
 ### Clean Architecture
 - Separação clara de responsabilidades em camadas
@@ -203,7 +203,7 @@ curl -X DELETE http://localhost:3000/foods/{id}
 - **I**nterface Segregation Principle
 - **D**ependency Inversion Principle
 
-## 🔄 Fluxo de Dependências
+## Fluxo de Dependências
 
 ```
 Repository → Use Case → Controller → Elysia (via Adapter)
@@ -234,13 +234,13 @@ bun run lint
 bun run type-check
 ```
 
-## 📝 Documentação
+## Documentação
 
 A documentação completa da API está disponível em:
 - **Swagger UI**: http://localhost:3000/swagger
 - **OpenAPI JSON**: http://localhost:3000/swagger/json
 
-## 🤝 Contribuindo
+## Contribuindo
 
 1. Faça um fork do projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
@@ -248,11 +248,11 @@ A documentação completa da API está disponível em:
 4. Push para a branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
 
-## 📄 Licença
+## Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
 
-## 👤 Autor
+## Autor
 
 Desenvolvido seguindo princípios de Clean Architecture e Clean Code.
 
