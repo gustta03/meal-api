@@ -4,9 +4,6 @@ import { MongoDBConnection } from "../database/mongodb.connection";
 import { FoodSchema, FoodDocument } from "../database/schemas/food.schema";
 import { Collection, ObjectId } from "mongodb";
 
-/**
- * Implementação do repositório de Food usando MongoDB
- */
 export class MongoDBFoodRepository implements IFoodRepository {
   private readonly collectionName = "foods";
   private get collection(): Collection<FoodDocument> {

@@ -1,10 +1,6 @@
 import { Food } from "@domain/entities/food.entity";
 import { IFoodRepository } from "@domain/repositories/food.repository";
 
-/**
- * Implementação em memória do repositório de Food
- * Para desenvolvimento e testes
- */
 export class InMemoryFoodRepository implements IFoodRepository {
   private foods: Map<string, Food> = new Map();
 
