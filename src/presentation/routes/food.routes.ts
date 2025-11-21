@@ -1,15 +1,12 @@
 import { Elysia, t } from "elysia";
-import { FoodController } from "../controllers/food.controller";
 import { AlysiaAdapter } from "../adapters/alysia.adapter";
 import { CreateFoodDto } from "@application/dtos/create-food.dto";
 import { UpdateFoodDto } from "@application/dtos/update-food.dto";
 import { FoodResponseDto } from "@application/dtos/food-response.dto";
+import { makeFoodController } from "@infrastructure/factories/controllers/food-controller-factory";
 
-/**
- * Rotas relacionadas a alimentos
- * Define as rotas HTTP e usa o adapter para conectar com o controller
- */
-export function createFoodRoutes(controller: FoodController) {
+export function createFoodRoutes() {
+  const controller = makeFoodController();
   return new Elysia({ prefix: "/foods" })
     .post(
       "/",
