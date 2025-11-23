@@ -9,6 +9,7 @@
     "test": "bun test",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit",
+    "seed:paco": "bun run src/scripts/seed-paco.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
