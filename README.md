@@ -1,6 +1,8 @@
-# Bot Nutri API
+# Meals AI
 
-![Meals Logo](docs/assets/meals-logo.png)
+<div align="center">
+  <img src="docs/assets/meals-logo.png" alt="Meals AI Logo" width="300"/>
+</div>
 
 API REST e bot WhatsApp para gerenciamento de alimentos e informações nutricionais, construída com **Bun** e **Elysia**, seguindo os princípios de **Clean Architecture** e **Clean Code**.
 
@@ -146,7 +148,7 @@ src/
 1. Clone o repositório:
 ```bash
 git clone <repository-url>
-cd bot-nutri
+cd meals-ai
 ```
 
 2. Instale as dependências:
@@ -166,7 +168,7 @@ Variáveis de ambiente disponíveis:
 ```
 # MongoDB Configuration
 MONGODB_URI=mongodb://admin:admin123@localhost:27017/?authSource=admin
-MONGODB_DB_NAME=bot-nutri
+MONGODB_DB_NAME=meals-ai
 
 # Server Configuration
 PORT=3000
