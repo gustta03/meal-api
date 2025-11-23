@@ -136,6 +136,18 @@ export class BaileysWhatsAppRepository implements IWhatsAppRepository {
     await this.sendMessage(groupId, message);
   }
 
+  async sendImage(to: string, imageBuffer: Buffer, caption?: string, mimeType: string = "image/png"): Promise<void> {
+    if (!this.socket) {
+      throw new Error("WhatsApp not connected");
+    }
+
+    await this.socket.sendMessage(to, {
+      image: imageBuffer,
+      caption: caption || "",
+      mimetype: mimeType,
+    });
+  }
+
   onMessage(callback: (message: Message) => Promise<void>): void {
     this.messageCallbacks.push(callback);
   }

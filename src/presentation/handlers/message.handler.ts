@@ -15,7 +15,9 @@ export class MessageHandler {
     if (result.success) {
       const sendDto: SendMessageDto = {
         to: message.from,
-        message: result.data,
+        message: result.data.message,
+        imageBuffer: result.data.imageBuffer,
+        imageMimeType: result.data.imageMimeType,
       };
 
       await this.sendMessageUseCase.execute(sendDto);

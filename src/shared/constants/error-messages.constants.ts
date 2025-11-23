@@ -21,5 +21,9 @@ export const ERROR_MESSAGES = {
   MESSAGE: {
     PROCESSING_FAILED: "Failed to process message",
   },
+  REPORT: {
+    WEEKLY_FAILED: "Failed to generate weekly report",
+    CHART_GENERATION_FAILED: "Failed to generate chart",
+  },
 } as const;
 

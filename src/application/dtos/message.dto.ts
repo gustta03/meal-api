@@ -11,5 +11,7 @@ export interface IncomingMessageDto {
 export interface SendMessageDto {
   to: string;
   message: string;
+  imageBuffer?: Buffer;
+  imageMimeType?: string;
 }
 
