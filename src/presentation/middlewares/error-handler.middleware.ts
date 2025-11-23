@@ -1,7 +1,8 @@
 import { Elysia } from "elysia";
+import { logger } from "@shared/logger/logger";
 
 export const errorHandler = new Elysia().onError(({ code, error, set }) => {
-  console.error(`Error [${code}]:`, error);
+  logger.error({ code, error }, `Error [${code}]`);
 
   const errorMessage =
     error instanceof Error

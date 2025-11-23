@@ -4,6 +4,7 @@ import { errorHandler } from "./presentation/middlewares/error-handler.middlewar
 import { MongoDBConnection } from "./infrastructure/database/mongodb.connection";
 import { registerRoutes } from "./presentation/routes";
 import { WhatsAppService } from "./infrastructure/whatsapp/whatsapp.service";
+import { logger } from "@shared/logger/logger";
 
 async function startServer() {
   try {
@@ -11,7 +12,7 @@ async function startServer() {
     try {
       await mongoConnection.connect();
     } catch (error) {
-      console.warn("MongoDB connection failed, continuing without database:", error);
+      logger.warn({ error }, "MongoDB connection failed, continuing without database");
     }
 
     const whatsappService = new WhatsAppService();
@@ -43,28 +44,35 @@ async function startServer() {
       .use(registerRoutes(new Elysia()))
       .listen(3000);
 
-    console.log(
-      `Server is running at http://${app.server?.hostname}:${app.server?.port}`
+    logger.info(
+      {
+        hostname: app.server?.hostname,
+        port: app.server?.port,
+      },
+      "Server is running"
     );
-    console.log(
-      `Swagger docs available at http://${app.server?.hostname}:${app.server?.port}/swagger`
+    logger.info(
+      {
+        url: `http://${app.server?.hostname}:${app.server?.port}/swagger`,
+      },
+      "Swagger docs available"
     );
 
     process.on("SIGINT", async () => {
-      console.log("\nShutting down gracefully...");
+      logger.info("Shutting down gracefully...");
       await whatsappService.stop();
       await mongoConnection.disconnect();
       process.exit(0);
     });
 
     process.on("SIGTERM", async () => {
-      console.log("\nShutting down gracefully...");
+      logger.info("Shutting down gracefully...");
       await whatsappService.stop();
       await mongoConnection.disconnect();
       process.exit(0);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error({ error }, "Failed to start server");
     process.exit(1);
   }
 }

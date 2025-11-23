@@ -9,6 +9,7 @@ import pino from "pino";
 import qrcode from "qrcode-terminal";
 import { IWhatsAppRepository } from "@domain/repositories/whatsapp.repository";
 import { Message } from "@domain/entities/message.entity";
+import { logger } from "@shared/logger/logger";
 
 export class BaileysWhatsAppRepository implements IWhatsAppRepository {
   private socket: WASocket | null = null;
@@ -31,6 +32,7 @@ export class BaileysWhatsAppRepository implements IWhatsAppRepository {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        logger.info("QR Code gerado para conectar ao WhatsApp");
         console.log("\nQR Code para conectar ao WhatsApp:\n");
         qrcode.generate(qr, { small: true });
         console.log("\nEscaneie o QR Code acima com o WhatsApp\n");
@@ -42,10 +44,13 @@ export class BaileysWhatsAppRepository implements IWhatsAppRepository {
           DisconnectReason.loggedOut;
 
         if (shouldReconnect) {
+          logger.warn("WhatsApp desconectado, tentando reconectar...");
           this.start();
+        } else {
+          logger.warn("WhatsApp desconectado permanentemente (logged out)");
         }
       } else if (connection === "open") {
-        console.log("WhatsApp connected");
+        logger.info("WhatsApp conectado com sucesso");
       }
     });
 

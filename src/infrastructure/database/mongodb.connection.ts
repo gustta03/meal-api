@@ -1,4 +1,5 @@
 import { MongoClient, Db } from "mongodb";
+import { logger } from "@shared/logger/logger";
 
 export class MongoDBConnection {
   private static instance: MongoDBConnection;
@@ -19,7 +20,7 @@ export class MongoDBConnection {
       return;
     }
 
-    const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
+    const uri = process.env.MONGODB_URI || "mongodb://admin:admin123@localhost:27017/?authSource=admin";
     const dbName = process.env.MONGODB_DB_NAME || "bot-nutri";
 
     try {
@@ -27,9 +28,9 @@ export class MongoDBConnection {
       await this.client.connect();
       this.db = this.client.db(dbName);
 
-      console.log("Connected to MongoDB");
+      logger.info({ dbName }, "Connected to MongoDB");
     } catch (error) {
-      console.error("Failed to connect to MongoDB:", error);
+      logger.error({ error, uri: uri.replace(/\/\/.*@/, "//***@") }, "Failed to connect to MongoDB");
       throw error;
     }
   }
@@ -46,7 +47,7 @@ export class MongoDBConnection {
       await this.client.close();
       this.client = null;
       this.db = null;
-      console.log("Disconnected from MongoDB");
+      logger.info("Disconnected from MongoDB");
     }
   }
 
