@@ -4,7 +4,9 @@ import { AnalyzeNutritionUseCase } from "./analyze-nutrition.use-case";
 import { SaveMealUseCase } from "./save-meal.use-case";
 import { GetDailySummaryUseCase } from "./get-daily-summary.use-case";
 import { GenerateWeeklyReportUseCase } from "./generate-weekly-report.use-case";
+import { ManageOnboardingUseCase } from "./manage-onboarding.use-case";
 import { MESSAGE } from "@shared/constants/message.constants";
+import { ONBOARDING } from "@shared/constants/onboarding.constants";
 import { ERROR_MESSAGES } from "@shared/constants/error-messages.constants";
 import { logger } from "@shared/logger/logger";
 import { NutritionAnalysisDto } from "../dtos/nutrition-analysis.dto";
@@ -21,7 +23,8 @@ export class ProcessMessageUseCase {
     private readonly analyzeNutritionUseCase: AnalyzeNutritionUseCase,
     private readonly saveMealUseCase: SaveMealUseCase,
     private readonly getDailySummaryUseCase: GetDailySummaryUseCase,
-    private readonly generateWeeklyReportUseCase: GenerateWeeklyReportUseCase
+    private readonly generateWeeklyReportUseCase: GenerateWeeklyReportUseCase,
+    private readonly manageOnboardingUseCase: ManageOnboardingUseCase
   ) {}
 
   async execute(message: Message): Promise<Result<ProcessMessageResult, string>> {
@@ -42,7 +45,27 @@ export class ProcessMessageUseCase {
     const messageBody = message.body;
     const lowerBody = messageBody.toLowerCase().trim();
 
+    const onboardingStatus = await this.manageOnboardingUseCase.checkUserStatus(message.from);
+
+    if (onboardingStatus.success && onboardingStatus.data.currentStep === "welcome") {
+      await this.manageOnboardingUseCase.advanceToNextStep(message.from);
+      return success({ message: ONBOARDING.MESSAGES.EXPLAINING });
+    }
+
+    if (onboardingStatus.success && onboardingStatus.data.currentStep === "explaining") {
+      if (lowerBody === "ok" || lowerBody === "entendi" || lowerBody === "entendido" || lowerBody === "vamos" || lowerBody === "vamos lá" || lowerBody === "pronto") {
+        await this.manageOnboardingUseCase.advanceToNextStep(message.from);
+        return success({ message: ONBOARDING.MESSAGES.EXPLAINING });
+      }
+    }
+
     if (lowerBody === MESSAGE.GREETINGS.OI || lowerBody === MESSAGE.GREETINGS.OLA || lowerBody === MESSAGE.GREETINGS.OLA_ALT) {
+      if (onboardingStatus.success && onboardingStatus.data.currentStep === "completed") {
+        return success({ message: MESSAGE.RESPONSES.GREETING });
+      }
+      if (onboardingStatus.success && onboardingStatus.data.currentStep === "welcome") {
+        return success({ message: ONBOARDING.MESSAGES.WELCOME });
+      }
       return success({ message: MESSAGE.RESPONSES.GREETING });
     }
 
@@ -69,6 +92,9 @@ export class ProcessMessageUseCase {
     const nutritionResult = await this.analyzeNutritionUseCase.executeFromText(messageBody);
 
     if (!nutritionResult.success) {
+      if (onboardingStatus.success && onboardingStatus.data.currentStep === "practicing") {
+        return success({ message: ONBOARDING.MESSAGES.PRACTICING_RETRY });
+      }
       return success({ message: MESSAGE.RESPONSES.NOT_UNDERSTOOD });
     }
 
@@ -79,8 +105,20 @@ export class ProcessMessageUseCase {
       logger.warn({ error: saveResult.error, userId: message.from }, "Failed to save meal, but showing analysis");
     }
 
+    const isCompletingOnboarding = onboardingStatus.success && onboardingStatus.data.currentStep === "practicing";
+    
+    if (isCompletingOnboarding) {
+      await this.manageOnboardingUseCase.completeOnboarding(message.from);
+    }
+
     const response = this.formatNutritionResponse(nutritionResult.data);
     const dailySummary = await this.getDailySummaryUseCase.execute(message.from);
+    
+    if (isCompletingOnboarding) {
+      return success({
+        message: `${response}\n\n${ONBOARDING.MESSAGES.PRACTICING_SUCCESS}`,
+      });
+    }
     
     if (dailySummary.success) {
       return success({
@@ -96,18 +134,32 @@ export class ProcessMessageUseCase {
       return failure(ERROR_MESSAGES.NUTRITION.INVALID_INPUT);
     }
 
+    const onboardingStatus = await this.manageOnboardingUseCase.checkUserStatus(message.from);
+    const isCompletingOnboarding = onboardingStatus.success && onboardingStatus.data.currentStep === "practicing";
+
     const nutritionResult = await this.analyzeNutritionUseCase.executeFromImage(
       message.imageBase64,
       message.imageMimeType
     );
 
     if (!nutritionResult.success) {
+      if (isCompletingOnboarding) {
+        return success({ message: ONBOARDING.MESSAGES.PRACTICING_RETRY });
+      }
       return failure(nutritionResult.error);
+    }
+
+    if (isCompletingOnboarding) {
+      await this.manageOnboardingUseCase.completeOnboarding(message.from);
     }
 
     const itemsList = nutritionResult.data.items.map((item) => `• ${item.name} (${item.quantity})`).join("\n");
 
-    const confirmationMessage = `Olá! Analisei a foto do seu prato e identifiquei os seguintes itens:\n\n${itemsList}\n\nEstá correto? Se sim, posso calcular os valores nutricionais completos para você! 😊\n\nConfirma esses itens? (sim/não)`;
+    let confirmationMessage = `Olá! Analisei a foto do seu prato e identifiquei os seguintes itens:\n\n${itemsList}\n\nEstá correto? Se sim, posso calcular os valores nutricionais completos para você! 😊\n\nConfirma esses itens? (sim/não)`;
+
+    if (isCompletingOnboarding) {
+      confirmationMessage = `${confirmationMessage}\n\n${ONBOARDING.MESSAGES.PRACTICING_SUCCESS}`;
+    }
 
     return success({ message: confirmationMessage });
   }

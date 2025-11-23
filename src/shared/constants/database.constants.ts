@@ -3,6 +3,7 @@ export const DATABASE = {
     FOODS: "foods",
     PACO_ITEMS: "paco_items",
     MEALS: "meals",
+    USER_SESSIONS: "user_sessions",
   },
   NAMES: {
     BOT_NUTRI: "bot-nutri",

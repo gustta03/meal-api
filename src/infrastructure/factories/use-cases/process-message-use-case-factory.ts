@@ -3,13 +3,15 @@ import { makeAnalyzeNutritionUseCase } from "./analyze-nutrition-use-case-factor
 import { makeSaveMealUseCase } from "./save-meal-use-case-factory";
 import { makeGetDailySummaryUseCase } from "./get-daily-summary-use-case-factory";
 import { createGenerateWeeklyReportUseCase } from "./generate-weekly-report-use-case-factory";
+import { makeManageOnboardingUseCase } from "./manage-onboarding-use-case-factory";
 
 export const makeProcessMessageUseCase = (): ProcessMessageUseCase => {
   return new ProcessMessageUseCase(
     makeAnalyzeNutritionUseCase(),
     makeSaveMealUseCase(),
     makeGetDailySummaryUseCase(),
-    createGenerateWeeklyReportUseCase()
+    createGenerateWeeklyReportUseCase(),
+    makeManageOnboardingUseCase()
   );
 };
 
