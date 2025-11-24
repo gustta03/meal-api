@@ -2,12 +2,21 @@ import { IWhatsAppRepository } from "@domain/repositories/whatsapp.repository";
 import { makeWhatsAppRepository } from "../factories/repositories/whatsapp-repository-factory";
 import { makeMessageHandler } from "../factories/handlers/message-handler-factory";
 
+let sharedRepositoryInstance: IWhatsAppRepository | null = null;
+
+export const getSharedWhatsAppRepository = (): IWhatsAppRepository => {
+  if (!sharedRepositoryInstance) {
+    sharedRepositoryInstance = makeWhatsAppRepository();
+  }
+  return sharedRepositoryInstance;
+};
+
 export class WhatsAppService {
   private repository: IWhatsAppRepository;
   private messageHandler = makeMessageHandler();
 
   constructor() {
-    this.repository = makeWhatsAppRepository();
+    this.repository = getSharedWhatsAppRepository();
     this.setupMessageHandler();
   }
 

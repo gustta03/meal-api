@@ -56,6 +56,24 @@ export class AlysiaAdapter {
     };
   }
 
+  static adaptWithQuery<T, Q>(
+    handler: (query: Q) => Promise<Result<T, string>>,
+    successStatus: number = 200
+  ) {
+    return async (context: { query: Q; set: any }) => {
+      const result = await handler(context.query);
+
+      if (!result.success) {
+        const status = this.getErrorStatus(result.error);
+        context.set.status = status;
+        return { error: result.error };
+      }
+
+      context.set.status = successStatus;
+      return result.data;
+    };
+  }
+
   static adaptWithParamsAndBody<T, P, B>(
     handler: (params: P, body: B) => Promise<Result<T, string>>,
     successStatus: number = 200

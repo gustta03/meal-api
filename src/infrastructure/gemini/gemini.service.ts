@@ -28,12 +28,25 @@ export class GeminiService {
 
     try {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      this.model = this.genAI.getGenerativeModel({
-        model: CONFIG.GEMINI.DEFAULT_MODEL,
-      });
-      this.visionModel = this.genAI.getGenerativeModel({
-        model: CONFIG.GEMINI.VISION_MODEL,
-      });
+      
+      try {
+        this.model = this.genAI.getGenerativeModel({
+          model: CONFIG.GEMINI.DEFAULT_MODEL,
+        });
+        this.visionModel = this.genAI.getGenerativeModel({
+          model: CONFIG.GEMINI.VISION_MODEL,
+        });
+        logger.info({ model: CONFIG.GEMINI.DEFAULT_MODEL, visionModel: CONFIG.GEMINI.VISION_MODEL }, "Gemini models initialized");
+      } catch (modelError) {
+        logger.warn({ error: modelError, configuredModel: CONFIG.GEMINI.DEFAULT_MODEL }, "Failed to initialize configured model, falling back to gemini-pro");
+        this.model = this.genAI.getGenerativeModel({
+          model: "gemini-pro",
+        });
+        this.visionModel = this.genAI.getGenerativeModel({
+          model: "gemini-pro-vision",
+        });
+        logger.info("Using fallback models: gemini-pro and gemini-pro-vision");
+      }
     } catch (error) {
       logger.error({ error }, "Failed to initialize Gemini service");
       throw error;
@@ -56,8 +69,23 @@ export class GeminiService {
         weightGrams: item.weightGrams,
         unit: item.unit,
       }));
-    } catch (error) {
-      logger.error({ error, text }, "Failed to extract food items from text");
+    } catch (error: any) {
+      const errorDetails = {
+        message: error?.message,
+        status: error?.status,
+        statusText: error?.statusText,
+        code: error?.code,
+        response: error?.response?.data || error?.response,
+      };
+      logger.error({ error: errorDetails, text }, "Failed to extract food items from text");
+      
+      if (error?.status === 404) {
+        throw new Error("Gemini API: Model not found or API endpoint incorrect. Please check your GEMINI_API_KEY and model configuration.");
+      }
+      if (error?.status === 401 || error?.status === 403) {
+        throw new Error("Gemini API: Invalid API key. Please check your GEMINI_API_KEY.");
+      }
+      
       throw new Error(ERROR_MESSAGES.GEMINI.FAILED_TO_PROCESS_TEXT);
     }
   }
