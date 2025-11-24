@@ -59,6 +59,7 @@ Para instruções detalhadas, veja a seção [Como Iniciar o Projeto](#como-inic
 - **Runtime**: [Bun](https://bun.sh/) - Runtime JavaScript/TypeScript de alta performance
 - **Framework**: [Elysia](https://elysiajs.com/) - Framework web minimalista e rápido
 - **Banco de Dados**: [MongoDB](https://www.mongodb.com/) - Banco de dados NoSQL
+- **API TACO**: [taco-api](https://github.com/raulfdm/taco-api) - API GraphQL da Tabela Brasileira de Composição de Alimentos (obrigatória)
 - **WhatsApp**: [Baileys](https://github.com/WhiskeySockets/Baileys) - Biblioteca para integração com WhatsApp
 - **IA**: [Google Gemini](https://ai.google.dev/) - API para processamento de linguagem natural e análise de imagens
 - **Gráficos**: [Chart.js Node Canvas](https://github.com/SeanSobey/ChartjsNodeCanvas) - Geração de gráficos em servidor
