@@ -1,0 +1,364 @@
+# Cursor Rules - Bot Nutri Project
+
+## Arquitetura e Organização
+
+### Clean Architecture
+- O projeto segue Clean Architecture com separação clara de camadas:
+  - `domain/`: Entidades e interfaces de repositórios (sem dependências externas)
+  - `application/`: Casos de uso, DTOs e mappers (depende apenas de domain)
+  - `infrastructure/`: Implementações concretas (repositórios, database, serviços externos)
+  - `presentation/`: Controllers, rotas, middlewares, adapters (depende de application)
+  - `shared/`: Código compartilhado (utils, types, logger, errors)
+
+### Regras de Dependência
+- Domain NUNCA importa de outras camadas
+- Application só importa de Domain e Shared
+- Infrastructure pode importar de Domain, Application e Shared
+- Presentation pode importar de todas as camadas
+- Use path aliases: `@domain/*`, `@application/*`, `@infrastructure/*`, `@presentation/*`, `@shared/*`
+
+## Proibição de Magic Strings e Magic Numbers
+
+### Magic Strings - PROIBIDO
+- NUNCA use strings literais diretamente no código
+- SEMPRE extraia para constantes nomeadas e descritivas
+- Crie arquivos de constantes em `src/shared/constants/` quando necessário
+
+**❌ ERRADO:**
+```typescript
+if (status === "active") { ... }
+await collection.findOne({ status: "pending" });
+throw new Error("Food not found");
+```
+
+**✅ CORRETO:**
+```typescript
+// Em src/shared/constants/status.constants.ts
+export const STATUS = {
+  ACTIVE: "active",
+  PENDING: "pending",
+  INACTIVE: "inactive",
+} as const;
+
+// Uso
+if (status === STATUS.ACTIVE) { ... }
+await collection.findOne({ status: STATUS.PENDING });
+```
+
+**❌ ERRADO:**
+```typescript
+const collectionName = "foods";
+const dbName = "bot-nutri";
+```
+
+**✅ CORRETO:**
+```typescript
+// Em src/shared/constants/database.constants.ts
+export const DATABASE = {
+  COLLECTIONS: {
+    FOODS: "foods",
+  },
+  NAMES: {
+    BOT_NUTRI: "bot-nutri",
+  },
+} as const;
+```
+
+### Magic Numbers - PROIBIDO
+- NUNCA use números literais sem contexto
+- SEMPRE extraia para constantes com nomes descritivos
+
+**❌ ERRADO:**
+```typescript
+if (calories < 0) { ... }
+if (retries > 5) { ... }
+setTimeout(() => {}, 3000);
+```
+
+**✅ CORRETO:**
+```typescript
+// Em src/shared/constants/nutrition.constants.ts
+export const NUTRITION = {
+  MIN_CALORIES: 0,
+  MIN_PROTEIN: 0,
+  MIN_CARBS: 0,
+  MIN_FAT: 0,
+} as const;
+
+// Em src/shared/constants/retry.constants.ts
+export const RETRY = {
+  MAX_ATTEMPTS: 5,
+  DELAY_MS: 3000,
+} as const;
+
+// Uso
+if (calories < NUTRITION.MIN_CALORIES) { ... }
+if (retries > RETRY.MAX_ATTEMPTS) { ... }
+setTimeout(() => {}, RETRY.DELAY_MS);
+```
+
+### Exceções Permitidas
+- Números óbvios e autoexplicativos: `0`, `1`, `-1` (em contextos matemáticos claros)
+- Índices de array: `array[0]`, `array.length - 1`
+- Operações matemáticas simples: `value * 2`, `value / 100`
+
+## Nomenclatura
+
+### Classes
+- Use PascalCase: `FoodController`, `CreateFoodUseCase`, `MongoDBConnection`
+- Nomes descritivos e específicos: evite `Manager`, `Handler`, `Service` genéricos
+- UseCase: termine com `UseCase`: `CreateFoodUseCase`, `UpdateFoodUseCase`
+- Repository: termine com `Repository`: `MongoDBFoodRepository`, `InMemoryFoodRepository`
+- Controller: termine com `Controller`: `FoodController`
+- Entity: use substantivo no singular: `Food`, `Message`
+
+### Interfaces
+- Prefixe com `I`: `IFoodRepository`, `IWhatsAppRepository`
+- Use substantivos descritivos
+
+### Funções e Métodos
+- Use camelCase: `createFood()`, `findById()`, `execute()`
+- Verbos no início: `create`, `update`, `delete`, `find`, `get`, `send`
+- Métodos privados: prefixe com `_` ou use `private`: `private validate()`, `_internalMethod()`
+
+### Constantes
+- Use UPPER_SNAKE_CASE: `MAX_RETRIES`, `DEFAULT_PORT`, `FOOD_COLLECTION`
+- Agrupe em objetos quando relacionadas: `DATABASE.COLLECTIONS.FOODS`
+
+### Variáveis
+- Use camelCase: `foodName`, `userId`, `isActive`
+- Booleanos: prefixe com `is`, `has`, `should`, `can`: `isValid`, `hasPermission`, `shouldRetry`
+- Arrays: use plural: `foods`, `users`, `messages`
+
+### Arquivos
+- Use kebab-case: `create-food.use-case.ts`, `food.controller.ts`, `mongodb-food.repository.ts`
+- Sufixos descritivos: `.use-case.ts`, `.controller.ts`, `.repository.ts`, `.dto.ts`, `.entity.ts`
+
+## Estrutura de Código
+
+### Imports
+- Ordene imports: externos → internos (path aliases) → relativos
+- Agrupe por tipo: bibliotecas → domain → application → infrastructure → presentation → shared → relativos
+- Use path aliases sempre que possível
+
+**✅ CORRETO:**
+```typescript
+import { Elysia } from "elysia";
+import { Food } from "@domain/entities/food.entity";
+import { CreateFoodUseCase } from "@application/use-cases/create-food.use-case";
+import { logger } from "@shared/logger/logger";
+import { FoodMapper } from "../mappers/food.mapper";
+```
+
+### Classes
+- Propriedades readonly quando possível
+- Constructor injection para dependências
+- Métodos privados para lógica interna
+- Validação em métodos privados
+
+### Use Cases
+- Um caso de uso por arquivo
+- Nome descritivo da ação: `CreateFoodUseCase`, `UpdateFoodUseCase`
+- Método `execute()` que recebe DTO e retorna `Result<T, E>`
+- Tratamento de erros com try/catch
+- Validações de negócio antes de operações
+
+**✅ CORRETO:**
+```typescript
+export class CreateFoodUseCase {
+  constructor(private readonly foodRepository: IFoodRepository) {}
+
+  async execute(dto: CreateFoodDto): Promise<Result<Food, string>> {
+    try {
+      // Validação e lógica de negócio
+      const existingFood = await this.foodRepository.findByName(dto.name);
+      if (existingFood) {
+        return failure(ERROR_MESSAGES.FOOD_ALREADY_EXISTS);
+      }
+      
+      const food = Food.create(/* ... */);
+      const savedFood = await this.foodRepository.save(food);
+      return success(savedFood);
+    } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : ERROR_MESSAGES.FAILED_TO_CREATE_FOOD;
+      return failure(errorMessage);
+    }
+  }
+}
+```
+
+### Repositórios
+- Implementam interfaces do domain
+- Um repositório por entidade agregada
+- Métodos assíncronos
+- Tratamento de erros específico
+- Não expor detalhes de implementação (MongoDB, etc.)
+
+### Controllers
+- Apenas orquestração: chamam use cases e mapeiam resultados
+- Sem lógica de negócio
+- Retornam DTOs, nunca entidades
+- Usam mappers para conversão
+
+## Tratamento de Erros
+
+### Result Pattern
+- Use `Result<T, E>` para operações que podem falhar
+- `success(data)` para sucesso
+- `failure(error)` para falhas
+- NUNCA lance exceções em use cases, sempre retorne `Result`
+
+### Mensagens de Erro
+- NUNCA use strings literais em mensagens de erro
+- Crie arquivo `src/shared/constants/error-messages.constants.ts`
+- Use constantes nomeadas
+
+**✅ CORRETO:**
+```typescript
+// src/shared/constants/error-messages.constants.ts
+export const ERROR_MESSAGES = {
+  FOOD_NOT_FOUND: "Food not found",
+  FOOD_ALREADY_EXISTS: "Food with this name already exists",
+  INVALID_NUTRITION_VALUE: "Nutrition value cannot be negative",
+  FAILED_TO_CREATE_FOOD: "Failed to create food",
+  FAILED_TO_UPDATE_FOOD: "Failed to update food",
+} as const;
+```
+
+### Logging
+- Use `logger` de `@shared/logger/logger`
+- NUNCA use `console.log`, `console.error`, `console.warn`
+- Use níveis apropriados: `debug`, `info`, `warn`, `error`
+- Inclua contexto relevante em objetos
+
+**✅ CORRETO:**
+```typescript
+import { logger } from "@shared/logger/logger";
+
+logger.info({ userId, action: "create_food" }, "Food created successfully");
+logger.error({ error, foodId }, "Failed to create food");
+logger.warn({ retryCount }, "Retrying connection");
+```
+
+## TypeScript
+
+### Tipos
+- Use tipos explícitos em funções públicas
+- Use `as const` para constantes literais
+- Evite `any`, use `unknown` quando necessário
+- Use tipos utilitários: `Readonly<T>`, `Partial<T>`, `Pick<T>`, `Omit<T>`
+
+### Interfaces vs Types
+- Use `interface` para objetos que podem ser estendidos
+- Use `type` para uniões, interseções, primitivos
+
+### Generics
+- Use quando apropriado para reutilização
+- Nomes descritivos: `T`, `E`, `K`, `V` são aceitáveis apenas em contextos genéricos
+
+### Validação
+- Valide entradas em entidades (método `validate()`)
+- Use TypeBox para validação de DTOs em rotas
+- Validações de negócio em use cases
+
+## Configuração e Ambiente
+
+### Variáveis de Ambiente
+- NUNCA hardcode valores de configuração
+- Use `process.env` com valores padrão seguros
+- Documente variáveis no `.env.example`
+- Valide variáveis críticas na inicialização
+
+**✅ CORRETO:**
+```typescript
+const port = Number(process.env.PORT) || DEFAULT_PORT;
+const mongoUri = process.env.MONGODB_URI || DEFAULT_MONGODB_URI;
+```
+
+### Constantes de Configuração
+- Crie `src/shared/constants/config.constants.ts` para valores padrão
+- Agrupe por contexto: `DATABASE`, `SERVER`, `WHATSAPP`, etc.
+
+## Testes (quando implementados)
+
+### Estrutura
+- Um arquivo de teste por arquivo de código
+- Use `describe` para agrupar testes relacionados
+- Use `it` ou `test` para casos individuais
+- Nomes descritivos: "should return error when food not found"
+
+### Mocks
+- Mock dependências externas
+- Use factories para criar dados de teste
+- Evite duplicação com helpers
+
+## Performance e Boas Práticas
+
+### Assíncrono
+- Use `async/await` em vez de Promises encadeadas
+- Trate erros adequadamente
+- Não use `Promise.all` desnecessariamente
+
+### Memória
+- Evite vazamentos: feche conexões, limpe listeners
+- Use `readonly` quando possível
+- Evite mutações desnecessárias
+
+### Legibilidade
+- Funções pequenas e focadas (máximo 20-30 linhas)
+- Evite aninhamento profundo (máximo 3 níveis)
+- Extraia lógica complexa para funções privadas
+- Comente apenas quando necessário (código autoexplicativo)
+
+## Checklist Antes de Commitar
+
+- [ ] Nenhuma magic string ou magic number
+- [ ] Todas as constantes extraídas para arquivos apropriados
+- [ ] Imports organizados e usando path aliases
+- [ ] Nomenclatura consistente com padrões do projeto
+- [ ] Tratamento de erros usando Result pattern
+- [ ] Logging usando logger (não console.*)
+- [ ] Tipos TypeScript explícitos
+- [ ] Código segue Clean Architecture
+- [ ] Sem dependências circulares
+- [ ] Validações implementadas
+
+## Exemplos de Estrutura de Constantes
+
+```typescript
+// src/shared/constants/database.constants.ts
+export const DATABASE = {
+  COLLECTIONS: {
+    FOODS: "foods",
+    MESSAGES: "messages",
+  },
+  NAMES: {
+    BOT_NUTRI: "bot-nutri",
+  },
+  DEFAULT_PORT: 27017,
+} as const;
+
+// src/shared/constants/server.constants.ts
+export const SERVER = {
+  DEFAULT_PORT: 3000,
+  DEFAULT_HOST: "0.0.0.0",
+  HEALTH_CHECK_PATH: "/health",
+} as const;
+
+// src/shared/constants/error-messages.constants.ts
+export const ERROR_MESSAGES = {
+  FOOD: {
+    NOT_FOUND: "Food not found",
+    ALREADY_EXISTS: "Food with this name already exists",
+    INVALID_NUTRITION: "Nutrition value cannot be negative",
+  },
+  DATABASE: {
+    CONNECTION_FAILED: "Failed to connect to database",
+    OPERATION_FAILED: "Database operation failed",
+  },
+} as const;
+```
+
+EVITE USAR LET SEMPRE QUE PUDER PRIORIZE O CONST
