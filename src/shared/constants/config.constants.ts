@@ -13,5 +13,8 @@ export const CONFIG = {
     DEFAULT_TEMPERATURE: 0.7,
     DEFAULT_MAX_TOKENS: 2048,
   },
+  TACO: {
+    API_URL: process.env.TACO_API_URL || "http://localhost:4000/graphql",
+  },
 } as const;
 
