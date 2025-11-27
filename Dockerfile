@@ -17,7 +17,9 @@ RUN bun run build || true
 FROM base AS release
 COPY --from=prerelease /app/node_modules node_modules
 COPY --from=prerelease /app/package.json .
+COPY --from=prerelease /app/bun.lock .
+COPY --from=prerelease /app/tsconfig.json .
 COPY --from=prerelease /app/src src
 
 EXPOSE 3000/tcp
-ENTRYPOINT [ "bun", "run", "src/index.ts" ]
+CMD [ "bun", "run", "src/index.ts" ]
