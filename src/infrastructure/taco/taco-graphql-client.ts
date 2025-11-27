@@ -44,7 +44,7 @@ export class TacoGraphQLClient {
   private readonly endpoint: string;
 
   constructor(endpoint?: string) {
-    this.endpoint = endpoint || CONFIG.TACO.API_URL;
+    this.endpoint = endpoint || CONFIG.TACO.API_URL as string;
   }
 
   async findByName(name: string): Promise<TacoFood | null> {

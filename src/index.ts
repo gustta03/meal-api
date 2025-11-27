@@ -5,6 +5,7 @@ import { MongoDBConnection } from "./infrastructure/database/mongodb.connection"
 import { registerRoutes } from "./presentation/routes";
 import { WhatsAppService } from "./infrastructure/whatsapp/whatsapp.service";
 import { logger } from "@shared/logger/logger";
+import { CONFIG } from "@shared/constants/config.constants";
 
 async function startServer() {
   try {
@@ -42,7 +43,7 @@ async function startServer() {
         timestamp: new Date().toISOString(),
       }))
       .use(registerRoutes(new Elysia()))
-      .listen(3000);
+      .listen(Number(process.env.PORT) || CONFIG.SERVER.DEFAULT_PORT);
 
     logger.info(
       {
