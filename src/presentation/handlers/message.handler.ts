@@ -45,6 +45,14 @@ export class MessageHandler {
           imageMimeType: result.data.imageMimeType,
         };
 
+        logger.debug({
+          messageId: message.id,
+          hasImageBuffer: !!sendDto.imageBuffer,
+          imageMimeType: sendDto.imageMimeType,
+          imageBufferSize: sendDto.imageBuffer?.length,
+          messageLength: sendDto.message.length,
+        }, "Preparing to send message with image");
+
         const sendResult = await this.sendMessageUseCase.execute(sendDto);
 
         if (sendResult.success) {

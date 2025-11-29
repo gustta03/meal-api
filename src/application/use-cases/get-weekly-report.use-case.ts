@@ -34,19 +34,49 @@ export class GetWeeklyReportUseCase {
 
   async execute(userId: string, startDate?: Date): Promise<Result<WeeklyReportDto, string>> {
     try {
-      const weekStart = this.getWeekStart(startDate || new Date());
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + REPORT.DAYS_IN_WEEK - 1);
-      weekEnd.setHours(23, 59, 59, 999);
+      const referenceDate = startDate || new Date();
+      const weekStart = this.getWeekStart(referenceDate);
+      
+      const calculatedWeekEnd = new Date(weekStart);
+      calculatedWeekEnd.setDate(calculatedWeekEnd.getDate() + REPORT.DAYS_IN_WEEK - 1);
+      
+      const today = new Date(referenceDate);
+      today.setHours(0, 0, 0, 0);
+      
+      const reportEndDate = today < calculatedWeekEnd ? today : calculatedWeekEnd;
+      const reportEndDateWithTime = new Date(reportEndDate);
+      reportEndDateWithTime.setHours(23, 59, 59, 999);
+      
+      const todayDateKey = this._getDateKey(today);
 
-      const meals = await this.mealRepository.findByUserIdAndDateRange(userId, weekStart, weekEnd);
+      logger.debug({
+        userId,
+        weekStart: weekStart.toISOString(),
+        reportEndDateWithTime: reportEndDateWithTime.toISOString(),
+        weekStartDateKey: this._getDateKey(weekStart),
+        reportEndDateKey: this._getDateKey(reportEndDate),
+        todayDateKey: this._getDateKey(today),
+      }, "Getting weekly report - date range");
+
+      const meals = await this.mealRepository.findByUserIdAndDateRange(userId, weekStart, reportEndDateWithTime);
+
+      logger.debug({
+        userId,
+        mealsCount: meals.length,
+        mealDates: meals.map((meal) => ({
+          date: meal.date instanceof Date ? meal.date.toISOString() : String(meal.date),
+          dateKey: this._getDateKey(meal.date),
+          kcal: meal.totals.kcal,
+        })),
+      }, "Meals found for weekly report");
 
       const daysMap = new Map<string, WeeklyReportDayDto>();
 
       for (let i = 0; i < REPORT.DAYS_IN_WEEK; i++) {
-        const currentDate = new Date(weekStart);
-        currentDate.setDate(currentDate.getDate() + i);
-        const dateKey = currentDate.toISOString().split("T")[0];
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(dayDate.getDate() + i);
+        dayDate.setHours(0, 0, 0, 0);
+        const dateKey = this._getDateKey(dayDate);
         
         daysMap.set(dateKey, {
           date: dateKey,
@@ -57,9 +87,24 @@ export class GetWeeklyReportUseCase {
           mealCount: 0,
         });
       }
+      
+      logger.debug({
+        userId,
+        daysMapKeys: Array.from(daysMap.keys()).sort(),
+        todayDateKey,
+        reportEndDateKey: this._getDateKey(reportEndDate),
+        isTodayInMap: daysMap.has(todayDateKey),
+        weekStartDateKey: this._getDateKey(weekStart),
+      }, "Days map created for weekly report");
+
+      logger.debug({
+        userId,
+        daysMapKeys: Array.from(daysMap.keys()),
+      }, "Days map created for weekly report");
 
       meals.forEach((meal) => {
-        const dateKey = meal.date.toISOString().split("T")[0];
+        const mealDate = meal.date instanceof Date ? new Date(meal.date) : new Date(meal.date);
+        const dateKey = this._getDateKey(mealDate);
         const dayData = daysMap.get(dateKey);
         
         if (dayData) {
@@ -68,16 +113,43 @@ export class GetWeeklyReportUseCase {
           dayData.carbG += meal.totals.carbG;
           dayData.fatG += meal.totals.fatG;
           dayData.mealCount += 1;
+          
+          logger.debug({
+            mealId: meal.id,
+            dateKey,
+            mealKcal: meal.totals.kcal,
+            dayKcalAfter: dayData.kcal,
+          }, "Meal added to day");
+        } else {
+          logger.warn({
+            mealId: meal.id,
+            mealDate: mealDate.toISOString(),
+            dateKey,
+            availableKeys: Array.from(daysMap.keys()),
+            weekStart: this._getDateKey(weekStart),
+            reportEndDate: this._getDateKey(reportEndDate),
+          }, "Meal date not found in days map - meal will be skipped");
         }
       });
 
-      const days = Array.from(daysMap.values()).map((day) => ({
-        ...day,
-        kcal: Math.round(day.kcal * 100) / 100,
-        proteinG: Math.round(day.proteinG * 100) / 100,
-        carbG: Math.round(day.carbG * 100) / 100,
-        fatG: Math.round(day.fatG * 100) / 100,
-      }));
+      const days = Array.from(daysMap.values())
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((day) => ({
+          ...day,
+          kcal: Math.round(day.kcal * 100) / 100,
+          proteinG: Math.round(day.proteinG * 100) / 100,
+          carbG: Math.round(day.carbG * 100) / 100,
+          fatG: Math.round(day.fatG * 100) / 100,
+        }));
+
+      logger.debug({
+        userId,
+        daysSummary: days.map((day) => ({
+          date: day.date,
+          kcal: day.kcal,
+          mealCount: day.mealCount,
+        })),
+      }, "Weekly report days summary");
 
       const weeklyTotals = {
         kcal: 0,
@@ -110,8 +182,8 @@ export class GetWeeklyReportUseCase {
       weeklyTotals.fatG = Math.round(weeklyTotals.fatG * 100) / 100;
 
       return success({
-        startDate: weekStart.toISOString().split("T")[0],
-        endDate: weekEnd.toISOString().split("T")[0],
+        startDate: this._getDateKey(weekStart),
+        endDate: this._getDateKey(reportEndDate),
         days,
         weeklyTotals,
       });
@@ -131,6 +203,15 @@ export class GetWeeklyReportUseCase {
     weekStart.setDate(diff);
     weekStart.setHours(0, 0, 0, 0);
     return weekStart;
+  }
+
+  private _getDateKey(date: Date): string {
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+    const year = normalizedDate.getFullYear();
+    const month = String(normalizedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(normalizedDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 }
 

@@ -65,16 +65,38 @@ export class MongoDBMealRepository implements IMealRepository {
 
   async findByUserIdAndDateRange(userId: string, startDate: Date, endDate: Date): Promise<Meal[]> {
     try {
+      const normalizedStartDate = new Date(startDate);
+      normalizedStartDate.setHours(0, 0, 0, 0);
+      
+      const normalizedEndDate = new Date(endDate);
+      normalizedEndDate.setHours(23, 59, 59, 999);
+
+      logger.debug({
+        userId,
+        startDate: normalizedStartDate.toISOString(),
+        endDate: normalizedEndDate.toISOString(),
+      }, "Finding meals by date range");
+
       const docs = await this.collection
         .find({
           userId,
           date: {
-            $gte: startDate,
-            $lte: endDate,
+            $gte: normalizedStartDate,
+            $lte: normalizedEndDate,
           },
         })
         .sort({ date: 1 })
         .toArray();
+
+      logger.debug({
+        userId,
+        mealsFound: docs.length,
+        mealDates: docs.map((doc) => ({
+          date: doc.date,
+          dateISO: doc.date instanceof Date ? doc.date.toISOString() : String(doc.date),
+          dateKey: doc.date instanceof Date ? this._getDateKey(doc.date) : "unknown",
+        })),
+      }, "Meals found in date range");
 
       return docs.map((doc) => this.toEntity(doc));
     } catch (error) {
@@ -106,14 +128,24 @@ export class MongoDBMealRepository implements IMealRepository {
   }
 
   private toEntity(doc: MealDocument): Meal {
+    const mealDate = doc.date instanceof Date ? new Date(doc.date) : new Date(doc.date);
     return Meal.create(
       doc._id,
       doc.userId,
       doc.items,
       doc.totals,
       doc.mealType,
-      doc.date
+      mealDate
     );
+  }
+
+  private _getDateKey(date: Date): string {
+    const normalizedDate = new Date(date);
+    normalizedDate.setHours(0, 0, 0, 0);
+    const year = normalizedDate.getFullYear();
+    const month = String(normalizedDate.getMonth() + 1).padStart(2, "0");
+    const day = String(normalizedDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   private toDocument(meal: Meal): MealDocument {

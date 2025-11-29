@@ -16,7 +16,10 @@ export class GenerateWeeklyReportUseCase {
     private readonly chartService: IChartService
   ) {}
 
-  async execute(userId: string, startDate?: Date): Promise<Result<WeeklyReportResult, string>> {
+  async execute(
+    userId: string,
+    startDate?: Date
+  ): Promise<Result<WeeklyReportResult, string>> {
     try {
       const reportResult = await this.getWeeklyReportUseCase.execute(userId, startDate);
 
@@ -58,24 +61,24 @@ export class GenerateWeeklyReportUseCase {
       const month = date.toLocaleDateString("pt-BR", { month: "short" });
       
       text += `📅 ${dayName}, ${dayNumber} ${month}:\n`;
-      text += `   • Calorias: ${day.kcal} kcal\n`;
-      text += `   • Proteína: ${day.proteinG} g\n`;
-      text += `   • Carboidrato: ${day.carbG} g\n`;
-      text += `   • Lipídio: ${day.fatG} g\n`;
+      text += `   • Calorias: ${Math.round(day.kcal)} kcal\n`;
+      text += `   • Proteína: ${Math.round(day.proteinG)} g\n`;
+      text += `   • Carboidrato: ${Math.round(day.carbG)} g\n`;
+      text += `   • Lipídio: ${Math.round(day.fatG)} g\n`;
       text += `   • Refeições: ${day.mealCount}\n\n`;
     });
 
     text += `📊 TOTAIS DA SEMANA:\n`;
-    text += `   • Total de Calorias: ${weeklyTotals.kcal} kcal\n`;
-    text += `   • Total de Proteína: ${weeklyTotals.proteinG} g\n`;
-    text += `   • Total de Carboidrato: ${weeklyTotals.carbG} g\n`;
-    text += `   • Total de Lipídio: ${weeklyTotals.fatG} g\n\n`;
+    text += `   • Total de Calorias: ${Math.round(weeklyTotals.kcal)} kcal\n`;
+    text += `   • Total de Proteína: ${Math.round(weeklyTotals.proteinG)} g\n`;
+    text += `   • Total de Carboidrato: ${Math.round(weeklyTotals.carbG)} g\n`;
+    text += `   • Total de Lipídio: ${Math.round(weeklyTotals.fatG)} g\n\n`;
 
     text += `📈 MÉDIAS DIÁRIAS:\n`;
-    text += `   • Média de Calorias: ${weeklyTotals.averageKcal} kcal/dia\n`;
-    text += `   • Média de Proteína: ${weeklyTotals.averageProteinG} g/dia\n`;
-    text += `   • Média de Carboidrato: ${weeklyTotals.averageCarbG} g/dia\n`;
-    text += `   • Média de Lipídio: ${weeklyTotals.averageFatG} g/dia\n\n`;
+    text += `   • Média de Calorias: ${Math.round(weeklyTotals.averageKcal)} kcal/dia\n`;
+    text += `   • Média de Proteína: ${Math.round(weeklyTotals.averageProteinG)} g/dia\n`;
+    text += `   • Média de Carboidrato: ${Math.round(weeklyTotals.averageCarbG)} g/dia\n`;
+    text += `   • Média de Lipídio: ${Math.round(weeklyTotals.averageFatG)} g/dia\n\n`;
 
     text += `Parabéns por acompanhar sua alimentação durante toda a semana! Continue assim, você está fazendo um ótimo trabalho! 🌟💪\n\n`;
     text += `Abaixo você encontrará um gráfico visual com a evolução dos seus nutrientes ao longo da semana.`;
