@@ -16,5 +16,9 @@ export const CONFIG = {
   TACO: {
     API_URL: process.env.TACO_API_URL,
   },
+  WHAPI: {
+    API_URL: process.env.WHAPI_API_URL || "https://gate.whapi.cloud",
+    API_TOKEN: process.env.WHAPI_API_TOKEN,
+    CHANNEL_ID: process.env.WHAPI_CHANNEL_ID,
+  },
 } as const;
-

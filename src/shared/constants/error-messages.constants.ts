@@ -21,6 +21,11 @@ export const ERROR_MESSAGES = {
   MESSAGE: {
     PROCESSING_FAILED: "Failed to process message",
   },
+  WHAPI: {
+    NOT_CONFIGURED: "Whapi API is not configured. Please set WHAPI_API_TOKEN and WHAPI_CHANNEL_ID",
+    SEND_FAILED: "Failed to send message via Whapi",
+    CHANNEL_NOT_CONNECTED: "Whapi channel is not connected",
+  },
   REPORT: {
     WEEKLY_FAILED: "Failed to generate weekly report",
     CHART_GENERATION_FAILED: "Failed to generate chart",
