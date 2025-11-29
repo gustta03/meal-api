@@ -3,6 +3,7 @@ import { Message } from "@domain/entities/message.entity";
 import { WhapiClient } from "./whapi-client";
 import { logger } from "@shared/logger/logger";
 import { ERROR_MESSAGES } from "@shared/constants/error-messages.constants";
+import { CONFIG } from "@shared/constants/config.constants";
 
 export class WhapiWhatsAppRepository implements IWhatsAppRepository {
   private readonly whapiClient: WhapiClient;
@@ -24,27 +25,18 @@ export class WhapiWhatsAppRepository implements IWhatsAppRepository {
       throw new Error(ERROR_MESSAGES.WHAPI.NOT_CONFIGURED);
     }
 
-    // Try to verify channel status, but don't block startup if it fails
-    // Messages will come via webhook regardless of this check
-    try {
-      const channel = await this.whapiClient.getChannelStatus();
-      if (channel && channel.status === "connected") {
-        logger.info({ channelId: channel.id, channelName: channel.name }, "Whapi channel is connected");
-      } else {
-        logger.warn(
-          { channelStatus: channel?.status || "unknown" },
-          "Could not verify Whapi channel status. Messages via webhook will still work if configured correctly."
-        );
-      }
-    } catch (error) {
-      logger.warn(
-        { error },
-        "Failed to verify Whapi channel status. This is not critical - messages via webhook will still work if configured correctly."
-      );
-    }
-
+    // Note: We don't verify channel status here because:
+    // 1. Messages come via webhook, so channel status check is not required for receiving messages
+    // 2. The channel verification endpoint may fail due to API changes or incorrect channel ID format
+    // 3. The important thing is that credentials are configured - webhook will work if properly set up
     this.isStarted = true;
-    logger.info("Whapi repository started (ready to receive messages via webhook)");
+    logger.info(
+      { 
+        apiUrl: CONFIG.WHAPI.API_URL,
+        hasChannelId: !!CONFIG.WHAPI.CHANNEL_ID,
+      },
+      "Whapi repository started. Ready to receive messages via webhook. Make sure webhook is configured in Whapi dashboard."
+    );
   }
 
   async stop(): Promise<void> {
