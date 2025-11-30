@@ -102,7 +102,7 @@ async function handleWebhook(body: any, isWhapiRepository: boolean, repository: 
       for (const chatUpdate of body.chats_updates) {
         if (chatUpdate.after_update?.last_message) {
           const lastMessage = chatUpdate.after_update.last_message;
-          if (!lastMessage.from_me && lastMessage.type === "text") {
+          if (!lastMessage.from_me && (lastMessage.type === "text" || lastMessage.type === "image")) {
             const whapiMessage = mapChatUpdateToWhapiMessage(lastMessage);
             if (whapiMessage) {
               await processWhapiMessage(whapiMessage, whapiRepository);
@@ -128,28 +128,46 @@ async function handleWebhook(body: any, isWhapiRepository: boolean, repository: 
 
 function mapChatUpdateToWhapiMessage(chatMessage: any): WhapiMessage | null {
   try {
-    if (!chatMessage || chatMessage.type !== "text") {
-      return null;
-    }
-
-    const body = chatMessage.text?.body || chatMessage.body || "";
-    if (!body) {
+    if (!chatMessage || (chatMessage.type !== "text" && chatMessage.type !== "image")) {
       return null;
     }
 
     const chatId = chatMessage.chat_id || "";
     const from = chatMessage.from || chatId;
+    const body = chatMessage.text?.body || chatMessage.body || chatMessage.caption || "";
 
-    return {
+    const baseMessage = {
       id: chatMessage.id || `${Date.now()}-${Math.random()}`,
       from: from,
       to: chatId,
       chat_id: chatId,
       timestamp: chatMessage.timestamp || Math.floor(Date.now() / 1000),
+      from_name: chatMessage.from_name,
+    };
+
+    if (chatMessage.type === "image") {
+      const mediaData = chatMessage.media || chatMessage.image || {};
+      return {
+        ...baseMessage,
+        body: body,
+        text: body ? { body: body } : undefined,
+        type: "image",
+        media: {
+          ...mediaData,
+          caption: body || mediaData.caption,
+        },
+      };
+    }
+
+    if (!body) {
+      return null;
+    }
+
+    return {
+      ...baseMessage,
       body: body,
       text: { body: body },
       type: "text",
-      from_name: chatMessage.from_name,
     };
   } catch (error) {
     logger.error({ error, chatMessage }, "Failed to map chat update to Whapi message");

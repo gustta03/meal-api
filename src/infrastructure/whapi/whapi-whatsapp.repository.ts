@@ -95,10 +95,30 @@ export class WhapiWhatsAppRepository implements IWhatsAppRepository {
     }
 
     try {
+      logger.debug(
+        {
+          messageType: whapiMessage.type,
+          hasMedia: !!whapiMessage.media,
+          hasImage: !!whapiMessage.image,
+          mediaKeys: whapiMessage.media ? Object.keys(whapiMessage.media) : [],
+          from: whapiMessage.from,
+        },
+        "Processing incoming message"
+      );
+
       const domainMessage = await this.mapWhapiMessageToDomain(whapiMessage);
       
       if (!domainMessage) {
-        logger.debug({ messageType: whapiMessage.type }, "Message type not supported, skipping");
+        logger.debug(
+          {
+            messageType: whapiMessage.type,
+            hasBody: !!whapiMessage.body,
+            hasText: !!whapiMessage.text,
+            hasMedia: !!whapiMessage.media,
+            hasImage: !!whapiMessage.image,
+          },
+          "Message type not supported or invalid, skipping"
+        );
         return;
       }
 
@@ -131,32 +151,39 @@ export class WhapiWhatsAppRepository implements IWhatsAppRepository {
         ? new Date(whapiMessage.timestamp * 1000)
         : new Date();
 
-      const hasImage = whapiMessage.type === "image" && !!whapiMessage.media;
+      const hasImage = whapiMessage.type === "image" && (!!whapiMessage.media || !!whapiMessage.image);
       let imageBase64: string | undefined;
       let imageMimeType: string | undefined;
 
-      if (hasImage && whapiMessage.media) {
-        imageMimeType = whapiMessage.media.mimetype || "image/jpeg";
+      if (hasImage) {
+        const mediaData = whapiMessage.media || whapiMessage.image || {};
+        imageMimeType = mediaData.mimetype || "image/jpeg";
         
-        if (whapiMessage.media.data) {
-          imageBase64 = whapiMessage.media.data.replace(/^data:image\/[a-z]+;base64,/, "");
-        } else if (whapiMessage.media.url) {
+        if (mediaData.data) {
+          imageBase64 = mediaData.data.replace(/^data:image\/[a-z]+;base64,/, "");
+        } else if (mediaData.url) {
           try {
-            logger.debug({ url: whapiMessage.media.url }, "Downloading image from URL");
-            const imageResponse = await fetch(whapiMessage.media.url);
+            logger.debug({ url: mediaData.url }, "Downloading image from URL");
+            const imageResponse = await fetch(mediaData.url);
             if (imageResponse.ok) {
               const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
               imageBase64 = imageBuffer.toString("base64");
             } else {
-              logger.warn({ url: whapiMessage.media.url, status: imageResponse.status }, "Failed to download image from URL");
+              logger.warn({ url: mediaData.url, status: imageResponse.status }, "Failed to download image from URL");
             }
           } catch (error) {
-            logger.error({ error, url: whapiMessage.media.url }, "Error downloading image from URL");
+            logger.error({ error, url: mediaData.url }, "Error downloading image from URL");
           }
+        }
+
+        if (!imageBase64 && !mediaData.url) {
+          logger.warn({ whapiMessage }, "Image message has no data or URL, skipping");
+          return null;
         }
       }
 
       if (!body && !hasImage) {
+        logger.debug({ type: whapiMessage.type, hasBody: !!body, hasImage }, "Message has no body and no image, skipping");
         return null;
       }
 
