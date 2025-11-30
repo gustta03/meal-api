@@ -1,4 +1,4 @@
-import { createCanvas, CanvasRenderingContext2D } from "canvas";
+import sharp from "sharp";
 import { PROGRESS_BAR } from "@shared/constants/goal.constants";
 import { logger } from "@shared/logger/logger";
 import { ERROR_MESSAGES } from "@shared/constants/error-messages.constants";
@@ -10,112 +10,60 @@ export interface IProgressBarService {
 export class ProgressBarService implements IProgressBarService {
   async generateCalorieProgressBar(currentCalories: number, goalCalories: number): Promise<Buffer> {
     try {
-      const canvas = createCanvas(PROGRESS_BAR.WIDTH, PROGRESS_BAR.HEIGHT);
-      const ctx = canvas.getContext("2d");
-
-      // Background
-      ctx.fillStyle = PROGRESS_BAR.BACKGROUND_COLOR;
-      ctx.fillRect(0, 0, PROGRESS_BAR.WIDTH, PROGRESS_BAR.HEIGHT);
-
-      // Calculate percentage
-      const percentage = Math.min((currentCalories / goalCalories) * 100, 100);
-      const barWidth = PROGRESS_BAR.WIDTH - PROGRESS_BAR.PADDING * 2;
-      const fillWidth = (barWidth * percentage) / 100;
-
-      // Title
-      ctx.fillStyle = PROGRESS_BAR.TEXT_COLOR;
-      ctx.font = `bold ${PROGRESS_BAR.TITLE_FONT_SIZE}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText("Meta Diária de Calorias", PROGRESS_BAR.WIDTH / 2, PROGRESS_BAR.PADDING);
-
-      // Current and goal values
-      const valuesY = PROGRESS_BAR.PADDING + PROGRESS_BAR.TITLE_FONT_SIZE + 20;
-      ctx.font = `bold ${PROGRESS_BAR.VALUE_FONT_SIZE}px Arial`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(`${Math.round(currentCalories)}`, PROGRESS_BAR.PADDING, valuesY);
+      const svg = this._generateProgressBarSVG(currentCalories, goalCalories);
+      const pngBuffer = await sharp(Buffer.from(svg))
+        .png()
+        .toBuffer();
       
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#6B7280";
-      ctx.font = `${PROGRESS_BAR.LABEL_FONT_SIZE}px Arial`;
-      ctx.textBaseline = "top";
-      ctx.fillText(`/ ${Math.round(goalCalories)} kcal`, PROGRESS_BAR.WIDTH - PROGRESS_BAR.PADDING, valuesY + (PROGRESS_BAR.VALUE_FONT_SIZE - PROGRESS_BAR.LABEL_FONT_SIZE) / 2);
-
-      // Progress bar background
-      const barY = valuesY + PROGRESS_BAR.VALUE_FONT_SIZE + 30;
-      ctx.fillStyle = PROGRESS_BAR.BAR_BACKGROUND_COLOR;
-      this.roundRect(
-        ctx,
-        PROGRESS_BAR.PADDING,
-        barY,
-        barWidth,
-        PROGRESS_BAR.BAR_HEIGHT,
-        PROGRESS_BAR.BAR_BORDER_RADIUS
-      );
-      ctx.fill();
-
-      // Progress bar fill
-      ctx.fillStyle = PROGRESS_BAR.BAR_FILL_COLOR;
-      this.roundRect(
-        ctx,
-        PROGRESS_BAR.PADDING,
-        barY,
-        fillWidth,
-        PROGRESS_BAR.BAR_HEIGHT,
-        PROGRESS_BAR.BAR_BORDER_RADIUS
-      );
-      ctx.fill();
-
-      // Percentage text
-      const percentageY = barY + PROGRESS_BAR.BAR_HEIGHT / 2;
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = `bold ${PROGRESS_BAR.PERCENTAGE_FONT_SIZE}px Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      
-      // Show percentage on the bar if there's enough space, otherwise above
-      if (fillWidth > 150) {
-        ctx.fillText(
-          `${Math.round(percentage)}%`,
-          PROGRESS_BAR.PADDING + fillWidth / 2,
-          percentageY
-        );
-      } else {
-        ctx.fillStyle = PROGRESS_BAR.TEXT_COLOR;
-        ctx.fillText(
-          `${Math.round(percentage)}%`,
-          PROGRESS_BAR.PADDING + fillWidth + 20,
-          percentageY
-        );
-      }
-
-      return canvas.toBuffer("image/png");
+      logger.debug({ currentCalories, goalCalories }, "Progress bar generated successfully");
+      return pngBuffer;
     } catch (error) {
       logger.error({ error, currentCalories, goalCalories }, "Failed to generate progress bar");
       throw new Error(ERROR_MESSAGES.REPORT.CHART_GENERATION_FAILED);
     }
   }
 
-  private roundRect(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    radius: number
-  ): void {
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + width - radius, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-    ctx.lineTo(x + width, y + height - radius);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-    ctx.lineTo(x + radius, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
+  private _generateProgressBarSVG(currentCalories: number, goalCalories: number): string {
+    const width = PROGRESS_BAR.WIDTH;
+    const height = PROGRESS_BAR.HEIGHT;
+    const padding = PROGRESS_BAR.PADDING;
+    const barWidth = width - padding * 2;
+    const barHeight = PROGRESS_BAR.BAR_HEIGHT;
+    const borderRadius = PROGRESS_BAR.BAR_BORDER_RADIUS;
+
+    const safeGoalCalories = Math.max(goalCalories, 1);
+    const percentage = Math.min((currentCalories / safeGoalCalories) * 100, 100);
+    const fillWidth = (barWidth * percentage) / 100;
+
+    const titleY = padding;
+    const valuesY = padding + PROGRESS_BAR.TITLE_FONT_SIZE + 20;
+    const barY = valuesY + PROGRESS_BAR.VALUE_FONT_SIZE + 30;
+    const percentageY = barY + barHeight / 2;
+
+    const currentCaloriesRounded = Math.round(currentCalories);
+    const goalCaloriesRounded = Math.round(goalCalories);
+    const percentageRounded = Math.round(percentage);
+
+    const percentageTextX = fillWidth > 150
+      ? padding + fillWidth / 2
+      : padding + fillWidth + 20;
+    const percentageTextColor = fillWidth > 150 ? "#FFFFFF" : PROGRESS_BAR.TEXT_COLOR;
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <rect width="${width}" height="${height}" fill="${PROGRESS_BAR.BACKGROUND_COLOR}"/>
+  
+  <text x="${width / 2}" y="${titleY + PROGRESS_BAR.TITLE_FONT_SIZE}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${PROGRESS_BAR.TITLE_FONT_SIZE}" font-weight="bold" fill="${PROGRESS_BAR.TEXT_COLOR}">Meta Diária de Calorias</text>
+  
+  <text x="${padding}" y="${valuesY + PROGRESS_BAR.VALUE_FONT_SIZE}" text-anchor="start" font-family="Arial, sans-serif" font-size="${PROGRESS_BAR.VALUE_FONT_SIZE}" font-weight="bold" fill="${PROGRESS_BAR.TEXT_COLOR}">${currentCaloriesRounded}</text>
+  
+  <text x="${width - padding}" y="${valuesY + PROGRESS_BAR.VALUE_FONT_SIZE + (PROGRESS_BAR.VALUE_FONT_SIZE - PROGRESS_BAR.LABEL_FONT_SIZE) / 2}" text-anchor="end" font-family="Arial, sans-serif" font-size="${PROGRESS_BAR.LABEL_FONT_SIZE}" fill="#6B7280">/ ${goalCaloriesRounded} kcal</text>
+  
+  <rect x="${padding}" y="${barY}" width="${barWidth}" height="${barHeight}" rx="${borderRadius}" fill="${PROGRESS_BAR.BAR_BACKGROUND_COLOR}"/>
+  
+  <rect x="${padding}" y="${barY}" width="${fillWidth}" height="${barHeight}" rx="${borderRadius}" fill="${PROGRESS_BAR.BAR_FILL_COLOR}"/>
+  
+  <text x="${percentageTextX}" y="${percentageY}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${PROGRESS_BAR.PERCENTAGE_FONT_SIZE}" font-weight="bold" fill="${percentageTextColor}">${percentageRounded}%</text>
+</svg>`;
   }
 }
-
