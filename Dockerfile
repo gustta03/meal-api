@@ -1,8 +1,14 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-# Install system fonts for SVG text rendering
+# Install dependencies for Canvas (needed for text rendering)
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
     fonts-dejavu-core \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
@@ -21,8 +27,14 @@ ENV NODE_ENV=production
 RUN bun run build || true
 
 FROM base AS release
-# Install fonts in the release stage as well
+# Install Canvas runtime dependencies (without -dev suffix for runtime)
 RUN apt-get update && apt-get install -y \
+    libcairo2 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libjpeg62-turbo \
+    libgif7 \
+    librsvg2-2 \
     fonts-dejavu-core \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
