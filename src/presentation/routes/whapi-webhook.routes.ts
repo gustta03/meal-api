@@ -180,15 +180,21 @@ async function processWhapiMessage(
   repository: WhapiWhatsAppRepository
 ): Promise<void> {
   try {
-    if (whapiMessage.type !== "text" && whapiMessage.type !== "image") {
+    const supportedTypes = ["text", "image", "reply"];
+    if (!supportedTypes.includes(whapiMessage.type)) {
       logger.debug({ type: whapiMessage.type }, "Message type not supported, skipping");
       return;
     }
 
-    if (whapiMessage.context?.from) {
-      logger.debug({ from: whapiMessage.context.from }, "Message is a reply, skipping");
-      return;
-    }
+
+    logger.debug(
+      {
+        type: whapiMessage.type,
+        hasContext: !!whapiMessage.context,
+        contextId: whapiMessage.context?.id,
+      },
+      "Processing message"
+    );
 
     await repository.processIncomingMessage(whapiMessage);
   } catch (error) {

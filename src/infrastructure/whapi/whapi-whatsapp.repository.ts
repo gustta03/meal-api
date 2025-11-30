@@ -178,10 +178,16 @@ export class WhapiWhatsAppRepository implements IWhatsAppRepository {
       const to = whapiMessage.to || whapiMessage.chat_id || "";
       let body = whapiMessage.body || whapiMessage.text?.body || (typeof whapiMessage.text === "string" ? whapiMessage.text : "") || "";
       
-      // Check if this is a button response (interactive message response)
+      if (whapiMessage.type === "reply") {
+        body = whapiMessage.text?.body || whapiMessage.body || "";
+        logger.debug({ body, hasContext: !!whapiMessage.context, contextId: whapiMessage.context?.id }, "Processing reply message");
+      }
+      
       if (whapiMessage.text?.button) {
         body = whapiMessage.text.button;
+        logger.debug({ buttonId: body }, "Button response detected");
       }
+      
       const isGroup = whapiMessage.group?.id ? true : from.includes("@g.us") || to.includes("@g.us");
       const groupId = whapiMessage.group?.id || (isGroup ? (to || from) : undefined);
 

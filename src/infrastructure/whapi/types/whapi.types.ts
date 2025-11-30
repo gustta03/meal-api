@@ -4,7 +4,7 @@ export interface WhapiMessage {
   to?: string;
   timestamp: number;
   body?: string;
-  type: "text" | "image" | "video" | "audio" | "document" | "location" | "contact" | "sticker";
+  type: "text" | "image" | "video" | "audio" | "document" | "location" | "contact" | "sticker" | "reply";
   media?: {
     mimetype?: string;
     data?: string;
