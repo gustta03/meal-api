@@ -15,7 +15,6 @@ import { NutritionAnalysisDto } from "../dtos/nutrition-analysis.dto";
 import { MealType } from "@domain/entities/meal.entity";
 import { PendingConfirmationService } from "@infrastructure/services/pending-confirmation.service";
 import { PendingGoalUpdateService } from "@infrastructure/services/pending-goal-update.service";
-import { PendingWeightInputService } from "@infrastructure/services/pending-weight-input.service";
 import { IProgressBarService } from "@infrastructure/services/progress-bar.service";
 import { IUserSessionRepository } from "@domain/repositories/user-session.repository";
 
@@ -23,15 +22,6 @@ export interface ProcessMessageResult {
   message: string;
   imageBuffer?: Buffer;
   imageMimeType?: string;
-  interactiveMessage?: {
-    header?: string;
-    body: string;
-    footer?: string;
-    buttons: Array<{
-      id: string;
-      title: string;
-    }>;
-  };
 }
 
 export class ProcessMessageUseCase {
@@ -69,39 +59,6 @@ export class ProcessMessageUseCase {
   private async processTextMessage(message: Message): Promise<Result<ProcessMessageResult, string>> {
     const messageBody = message.body;
     const lowerBody = messageBody.toLowerCase().trim();
-
-    // Check for button responses first
-    if (this.isButtonResponse(messageBody)) {
-      return this.handleButtonResponse(message.from, messageBody);
-    }
-
-    // Check for pending weight input (after button responses)
-    if (PendingWeightInputService.hasPendingWeightInput(message.from)) {
-      if (!PendingConfirmationService.hasPendingConfirmation(message.from)) {
-        PendingWeightInputService.clearPendingWeightInput(message.from);
-        return success({ 
-          message: "Não há confirmação pendente. Por favor, envie uma foto novamente." 
-        });
-      }
-
-      const pendingData = PendingConfirmationService.getPendingConfirmation(message.from);
-      if (pendingData) {
-        const weightsResult = this.parseWeightInput(messageBody, pendingData.items);
-        if (!weightsResult.success) {
-          return success({ 
-            message: weightsResult.error || "Não consegui entender os pesos informados. Por favor, use o formato:\n\n*Item*: *peso em gramas*\n\nExemplo:\n*ovos mexidos*: 150" 
-          });
-        }
-
-        const updatedItems = weightsResult.data;
-        const updatedPendingData = { items: updatedItems };
-        
-        PendingWeightInputService.clearPendingWeightInput(message.from);
-        PendingConfirmationService.clearPendingConfirmation(message.from);
-        
-        return this.processPendingNutritionData(message.from, updatedPendingData);
-      }
-    }
 
     // Check for pending confirmation first (has higher priority than goal updates)
     if (PendingConfirmationService.hasPendingConfirmation(message.from)) {
@@ -319,183 +276,13 @@ export class ProcessMessageUseCase {
 
     const itemsList = extractedItems.map((item) => `• ${item.name} (${item.quantity})`).join("\n");
 
-    const bodyText = `Olá! Analisei a foto do seu prato e identifiquei os seguintes itens:\n\n${itemsList}\n\nEstá correto? Se sim, posso calcular os valores nutricionais completos para você! 😊`;
+    let confirmationMessage = `Olá! Analisei a foto do seu prato e identifiquei os seguintes itens:\n\n${itemsList}\n\nEstá correto? Se sim, posso calcular os valores nutricionais completos para você! 😊\n\nConfirma esses itens? (sim/não)`;
 
-    const footerText = isCompletingOnboarding 
-      ? ONBOARDING.MESSAGES.PRACTICING_SUCCESS 
-      : "Se você souber o peso exato, pode informá-lo!";
-
-    return success({
-      message: bodyText,
-      interactiveMessage: {
-        body: bodyText,
-        footer: footerText,
-        buttons: [
-          {
-            id: "confirm_yes",
-            title: "✅ Sim, está correto",
-          },
-          {
-            id: "confirm_with_weight",
-            title: "⚖️ Informar peso",
-          },
-          {
-            id: "confirm_no",
-            title: "❌ Não está correto",
-          },
-        ],
-      },
-    });
-  }
-
-  private isButtonResponse(body: string): boolean {
-    const buttonIds = ["confirm_yes", "confirm_no", "confirm_with_weight"];
-    const buttonTexts = [
-      "✅ sim, está correto",
-      "❌ não está correto",
-      "⚖️ informar peso",
-      "sim, está correto",
-      "não está correto",
-      "informar peso",
-    ];
-    
-    const normalizedBody = body.trim().toLowerCase();
-    
-    return buttonIds.some(id => normalizedBody === id) ||
-           buttonTexts.some(text => normalizedBody.includes(text));
-  }
-
-  private extractButtonId(body: string): string | null {
-    const normalizedBody = body.trim().toLowerCase();
-    
-    if (normalizedBody === "confirm_yes" || normalizedBody.includes("sim, está correto") || normalizedBody.includes("sim esta correto")) {
-      return "confirm_yes";
-    }
-    
-    if (normalizedBody === "confirm_no" || normalizedBody.includes("não está correto") || normalizedBody.includes("nao esta correto")) {
-      return "confirm_no";
-    }
-    
-    if (normalizedBody === "confirm_with_weight" || normalizedBody.includes("informar peso")) {
-      return "confirm_with_weight";
-    }
-    
-    return null;
-  }
-
-  private async handleButtonResponse(
-    userId: string,
-    buttonIdOrBody: string
-  ): Promise<Result<ProcessMessageResult, string>> {
-    const buttonId = this.extractButtonId(buttonIdOrBody);
-    
-    if (!buttonId) {
-      return success({ 
-        message: "Não reconheci sua resposta. Por favor, use os botões ou digite 'sim' ou 'não'." 
-      });
-    }
-    if (!PendingConfirmationService.hasPendingConfirmation(userId)) {
-      return success({ 
-        message: "Não há confirmação pendente. Por favor, envie uma foto novamente." 
-      });
+    if (isCompletingOnboarding) {
+      confirmationMessage = `${confirmationMessage}\n\n${ONBOARDING.MESSAGES.PRACTICING_SUCCESS}`;
     }
 
-    const pendingData = PendingConfirmationService.getPendingConfirmation(userId);
-    
-    if (buttonId === "confirm_no") {
-      PendingConfirmationService.clearPendingConfirmation(userId);
-      return success({ 
-        message: "Entendi! Se quiser, pode enviar outra foto ou descrever sua refeição novamente. 😊" 
-      });
-    }
-
-    if (buttonId === "confirm_with_weight") {
-      if (!pendingData) {
-        return success({ 
-          message: "Não há dados pendentes. Por favor, envie uma foto novamente." 
-        });
-      }
-      
-      PendingWeightInputService.setPendingWeightInput(userId);
-      const itemsList = pendingData.items.map((item) => `• ${item.name}`).join("\n");
-      return success({ 
-        message: `Por favor, informe o peso de cada item no formato:\n\n*Item*: *peso em gramas*\n\nItens identificados:\n${itemsList}\n\nExemplo:\n*ovos mexidos*: 150\n*morango*: 100\n*uva*: 80` 
-      });
-    }
-
-    if (buttonId === "confirm_yes") {
-      if (!pendingData) {
-        return success({ 
-          message: "Não há dados pendentes. Por favor, envie uma foto novamente." 
-        });
-      }
-      
-      PendingConfirmationService.clearPendingConfirmation(userId);
-      return this.processPendingNutritionData(userId, pendingData);
-    }
-
-    return success({ 
-      message: "Não consegui processar sua resposta. Por favor, tente novamente." 
-    });
-  }
-
-  private parseWeightInput(
-    input: string,
-    items: Array<{ name: string; quantity: string; weightGrams: number; unit?: string }>
-  ): Result<Array<{ name: string; quantity: string; weightGrams: number; unit?: string }>, string> {
-    try {
-      const lines = input.split("\n").filter(line => line.trim().length > 0);
-      const weightMap = new Map<string, number>();
-
-      for (const line of lines) {
-        const match = line.match(/(?:^|\*)([^*:]+?)(?:\*|):\s*(\d+)/i);
-        if (match) {
-          const itemName = match[1].trim().toLowerCase();
-          const weight = parseInt(match[2], 10);
-          
-          if (weight > 0 && weight <= 100000) {
-            weightMap.set(itemName, weight);
-          }
-        }
-      }
-
-      if (weightMap.size === 0) {
-        return failure("Não encontrei pesos válidos no formato esperado.");
-      }
-
-      const updatedItems = items.map(item => {
-        const itemNameLower = item.name.toLowerCase();
-        let matchedWeight: number | undefined;
-
-        for (const [key, weight] of weightMap.entries()) {
-          if (itemNameLower.includes(key) || key.includes(itemNameLower)) {
-            matchedWeight = weight;
-            break;
-          }
-        }
-
-        if (matchedWeight !== undefined) {
-          return {
-            ...item,
-            weightGrams: matchedWeight,
-          };
-        }
-
-        return item;
-      });
-
-      const updatedCount = updatedItems.filter((item, idx) => item.weightGrams !== items[idx].weightGrams).length;
-      
-      if (updatedCount === 0) {
-        return failure("Não consegui associar os pesos informados aos itens identificados.");
-      }
-
-      logger.debug({ updatedCount, totalItems: items.length }, "Weight input parsed successfully");
-      return success(updatedItems);
-    } catch (error) {
-      logger.error({ error, input }, "Failed to parse weight input");
-      return failure("Erro ao processar os pesos informados.");
-    }
+    return success({ message: confirmationMessage });
   }
 
   private isConfirmationResponse(text: string): boolean | null {
