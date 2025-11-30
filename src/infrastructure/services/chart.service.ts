@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { Resvg } from "@resvg/resvg-js";
 import { WeeklyReportDto } from "@application/use-cases/get-weekly-report.use-case";
 import { REPORT } from "@shared/constants/report.constants";
 import { ERROR_MESSAGES } from "@shared/constants/error-messages.constants";
@@ -16,9 +16,15 @@ export class ChartService implements IChartService {
   async generateWeeklyNutritionChart(report: WeeklyReportDto): Promise<Buffer> {
     try {
       const svg = this._generateChartSVG(report);
-      const pngBuffer = await sharp(Buffer.from(svg))
-        .png()
-        .toBuffer();
+      
+      const resvg = new Resvg(svg, {
+        font: {
+          loadSystemFonts: true,
+        },
+      });
+      
+      const pngData = resvg.render();
+      const pngBuffer = pngData.asPng();
       
       logger.debug({ reportStartDate: report.startDate, reportEndDate: report.endDate }, "Weekly nutrition chart generated successfully");
       return pngBuffer;
@@ -37,9 +43,15 @@ export class ChartService implements IChartService {
       const progressBarsSvg = this._generateProgressBarsSVG(report, goalCalories);
       
       const combinedSvg = this._combineSVGs(chartSvg, progressBarsSvg);
-      const pngBuffer = await sharp(Buffer.from(combinedSvg))
-        .png()
-        .toBuffer();
+      
+      const resvg = new Resvg(combinedSvg, {
+        font: {
+          loadSystemFonts: true,
+        },
+      });
+      
+      const pngData = resvg.render();
+      const pngBuffer = pngData.asPng();
       
       logger.debug({ reportStartDate: report.startDate, reportEndDate: report.endDate, goalCalories }, "Weekly chart with progress bars generated successfully");
       return pngBuffer;
@@ -142,14 +154,14 @@ export class ChartService implements IChartService {
     const xAxisLabels = labels
       .map(
         (label, index) =>
-          `<text x="${chartX + index * xScale}" y="${chartY + chartHeight + 30}" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#1F2937">${label}</text>`
+          `<text x="${chartX + index * xScale}" y="${chartY + chartHeight + 30}" text-anchor="middle" class="axis-label">${label}</text>`
       )
       .join("\n");
 
     const yAxisLabels = Array.from({ length: 6 }, (_, i) => {
       const value = (maxValue / 5) * (5 - i);
       const y = chartY + (chartHeight / 5) * i;
-      return `<text x="${chartX - 10}" y="${y + 5}" text-anchor="end" font-family="Arial, sans-serif" font-size="11" fill="#6B7280">${Math.round(value)}</text>`;
+      return `<text x="${chartX - 10}" y="${y + 5}" text-anchor="end" class="y-axis-label">${Math.round(value)}</text>`;
     }).join("\n");
 
     const startDateFormatted = this._formatDateForTitle(report.startDate);
@@ -160,9 +172,17 @@ export class ChartService implements IChartService {
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .chart-title { font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: bold; fill: #1F2937; }
+      .axis-label { font-family: Arial, Helvetica, sans-serif; font-size: 12px; fill: #1F2937; }
+      .y-axis-label { font-family: Arial, Helvetica, sans-serif; font-size: 11px; fill: #6B7280; }
+      .legend-label { font-family: Arial, Helvetica, sans-serif; font-size: 14px; fill: #1F2937; }
+    </style>
+  </defs>
   <rect width="${width}" height="${height}" fill="white"/>
   
-  <text x="${width / 2}" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1F2937">${escapedTitle}</text>
+  <text x="${width / 2}" y="30" text-anchor="middle" class="chart-title">${escapedTitle}</text>
   
   <g id="grid">${gridLines}</g>
   
@@ -187,13 +207,13 @@ export class ChartService implements IChartService {
   
   <g id="legend" transform="translate(${width / 2 - 150}, ${height - 40})">
     <circle cx="0" cy="0" r="6" fill="${REPORT.CHART.COLORS.CALORIES}"/>
-    <text x="15" y="5" font-family="Arial, sans-serif" font-size="14" fill="#1F2937">Calorias (kcal)</text>
+    <text x="15" y="5" class="legend-label">Calorias (kcal)</text>
     
     <circle cx="150" cy="0" r="6" fill="${REPORT.CHART.COLORS.PROTEIN}"/>
-    <text x="165" y="5" font-family="Arial, sans-serif" font-size="14" fill="#1F2937">Proteína (g)</text>
+    <text x="165" y="5" class="legend-label">Proteína (g)</text>
     
     <circle cx="280" cy="0" r="6" fill="${REPORT.CHART.COLORS.CARBS}"/>
-    <text x="295" y="5" font-family="Arial, sans-serif" font-size="14" fill="#1F2937">Carboidrato (g)</text>
+    <text x="295" y="5" class="legend-label">Carboidrato (g)</text>
   </g>
 </svg>`;
   }
@@ -231,15 +251,20 @@ export class ChartService implements IChartService {
         const barInnerWidth = barWidth - padding * 2;
         const barInnerHeight = 40;
 
+        const percentageTextColor = percentage >= 50 ? "#FFFFFF" : "#1F2937";
+        const percentageText = fillWidth > 60 
+          ? `<text x="${barX + fillWidth / 2}" y="${barY + barInnerHeight / 2}" text-anchor="middle" dominant-baseline="middle" class="progress-percentage" fill="${percentageTextColor}">${Math.round(percentage)}%</text>`
+          : "";
+
         return `
           <g id="bar-${index}">
-            <text x="${barX}" y="${y + 5}" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#1F2937">${dayName} ${dayNumber}/${month}</text>
-            <text x="${barX}" y="${y + 25}" font-family="Arial, sans-serif" font-size="16" fill="#6B7280">${Math.round(day.kcal)}/${Math.round(goalCalories)} kcal</text>
+            <text x="${barX}" y="${y + 5}" class="progress-day-title">${dayName} ${dayNumber}/${month}</text>
+            <text x="${barX}" y="${y + 25}" class="progress-day-label">${Math.round(day.kcal)}/${Math.round(goalCalories)} kcal</text>
             
             <rect x="${barX}" y="${barY}" width="${barInnerWidth}" height="${barInnerHeight}" fill="#E5E7EB" rx="4"/>
             <rect x="${barX}" y="${barY}" width="${fillWidth}" height="${barInnerHeight}" fill="${percentage >= 100 ? "#EF4444" : "#3B82F6"}" rx="4"/>
             
-            ${this._generatePercentageText(fillWidth, barX, barY, barInnerHeight, percentage)}
+            ${percentageText}
           </g>
         `;
       })
@@ -247,8 +272,16 @@ export class ChartService implements IChartService {
 
     return `
       <svg width="${width}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <style>
+            .progress-title { font-family: Arial, Helvetica, sans-serif; font-size: 28px; font-weight: bold; fill: #1F2937; }
+            .progress-day-title { font-family: Arial, Helvetica, sans-serif; font-size: 18px; font-weight: bold; fill: #1F2937; }
+            .progress-day-label { font-family: Arial, Helvetica, sans-serif; font-size: 16px; fill: #6B7280; }
+            .progress-percentage { font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: bold; }
+          </style>
+        </defs>
         <rect width="${width}" height="${totalHeight}" fill="white"/>
-        <text x="${width / 2}" y="35" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#1F2937">Progresso Diário em Relação à Meta</text>
+        <text x="${width / 2}" y="35" text-anchor="middle" class="progress-title">Progresso Diário em Relação à Meta</text>
         ${bars}
       </svg>
     `;
@@ -328,21 +361,4 @@ export class ChartService implements IChartService {
     });
   }
 
-  private _generatePercentageText(
-    fillWidth: number,
-    barX: number,
-    barY: number,
-    barInnerHeight: number,
-    percentage: number
-  ): string {
-    if (fillWidth <= 60) {
-      return "";
-    }
-
-    const textColor = percentage >= 50 ? "#FFFFFF" : "#1F2937";
-    const textX = barX + fillWidth / 2;
-    const textY = barY + barInnerHeight / 2;
-    
-    return `<text x="${textX}" y="${textY}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textColor}">${Math.round(percentage)}%</text>`;
-  }
 }
