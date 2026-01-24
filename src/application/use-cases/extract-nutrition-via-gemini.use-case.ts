@@ -63,69 +63,34 @@ export class ExtractNutritionViaGeminiUseCase {
   }
 
   /**
-   * Extrai dados nutricionais para múltiplos alimentos
+   * Extrai dados nutricionais de uma mensagem completa do usuário
    */
-  async executeForFoods(
-    foods: Array<{ description: string; weightGrams: number }>
-  ): Promise<Result<NutritionAnalysisDto, string>> {
-    if (foods.length === 0) {
+  async executeForMessage(messageBody: string): Promise<Result<NutritionAnalysisDto, string>> {
+    if (!messageBody || messageBody.trim().length === 0) {
       return failure(ERROR_MESSAGES.NUTRITION.INVALID_INPUT);
     }
 
-    // Filtrar alimentos inválidos antes de processar
-    const validFoods = foods.filter((food) => {
-      const description = food.description?.trim();
-      return (
-        description &&
-        description.length > 0 &&
-        !/^\d+$/.test(description) && // Não é apenas um número
-        description.toLowerCase() !== "de" &&
-        description.toLowerCase() !== "e" &&
-        food.weightGrams > 0 &&
-        food.weightGrams <= 5000
-      );
-    });
-
-    if (validFoods.length === 0) {
-      logger.warn(
-        { originalFoods: foods },
-        "No valid foods after filtering"
-      );
-      return failure("Não foi possível identificar alimentos válidos na mensagem");
-    }
-
-    if (validFoods.length < foods.length) {
-      logger.warn(
-        {
-          originalCount: foods.length,
-          validCount: validFoods.length,
-          filteredOut: foods.length - validFoods.length,
-        },
-        "Some foods were filtered out as invalid"
-      );
-    }
-
     try {
-      const extractedItems = await Promise.all(
-        validFoods.map((food) =>
-          this.geminiExtractor.extract(food.description, food.weightGrams)
-        )
-      );
+      const extractedResults = await this.geminiExtractor.extractFromMessage(messageBody.trim());
 
-      // Validar se todos foram extraídos com sucesso
-      const invalidItems = extractedItems.filter((item) => !item.isValid);
-      if (invalidItems.length > 0) {
+      const validItems = extractedResults.filter((item) => item.isValid);
+      
+      if (validItems.length === 0) {
         logger.warn(
-          { totalItems: validFoods.length, failedItems: invalidItems.length },
-          "Some nutrition items failed to extract"
+          { messageBody, totalItems: extractedResults.length },
+          "No valid foods extracted from message"
         );
-        // Continuar com itens válidos
+        return failure("Não consegui extrair dados nutricionais de nenhum alimento");
       }
 
-      const validItems = extractedItems.filter((item) => item.isValid);
-      if (validItems.length === 0) {
-        return failure(
-          "Não consegui extrair dados nutricionais de nenhum alimento"
+      if (validItems.length < extractedResults.length) {
+        logger.warn(
+          {
+            totalItems: extractedResults.length,
+            validItems: validItems.length,
+            failedItems: extractedResults.length - validItems.length,
+          },
+          "Some foods failed validation"
         );
       }
 
@@ -136,12 +101,23 @@ export class ExtractNutritionViaGeminiUseCase {
         error instanceof Error ? error.message : ERROR_MESSAGES.NUTRITION.FAILED_TO_ANALYZE;
 
       logger.error(
-        { error, foodCount: validFoods.length },
-        "Error extracting multiple foods via Gemini"
+        { error, messageBody },
+        "Error extracting nutrition from message via Gemini"
       );
 
       return failure(errorMessage);
     }
+  }
+
+  /**
+   * Extrai dados nutricionais para múltiplos alimentos (mantido para compatibilidade)
+   * @deprecated Use executeForMessage instead
+   */
+  async executeForFoods(
+    foods: Array<{ description: string; weightGrams: number }>
+  ): Promise<Result<NutritionAnalysisDto, string>> {
+    const messageBody = foods.map((f) => `${f.weightGrams}g ${f.description}`).join(" e ");
+    return this.executeForMessage(messageBody);
   }
 
   /**

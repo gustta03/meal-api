@@ -310,13 +310,11 @@ export class ProcessMessageUseCase {
     pendingData: { items: Array<{ name: string; quantity: string; weightGrams: number; unit?: string }> }
   ): Promise<Result<ProcessMessageResult, string>> {
     try {
-      // Extrair nutrição via Gemini para os itens confirmados
-      const foods = pendingData.items.map((item) => ({
-        description: item.name,
-        weightGrams: item.weightGrams,
-      }));
+      const messageBody = pendingData.items
+        .map((item) => `${item.weightGrams}g ${item.name}`)
+        .join(" e ");
 
-      const nutritionResult = await this.extractNutritionViaGeminiUseCase.executeForFoods(foods);
+      const nutritionResult = await this.extractNutritionViaGeminiUseCase.executeForMessage(messageBody);
 
       if (!nutritionResult.success) {
         logger.warn(
@@ -376,7 +374,7 @@ export class ProcessMessageUseCase {
     const itemsList = data.items
       .map(
         (item) =>
-          `• ${item.name} (${item.quantity} - ${item.weightGrams}g):\n  ${item.nutrients.kcal} kcal | ${item.nutrients.proteinG}g proteína | ${item.nutrients.carbG}g carboidrato | ${item.nutrients.fatG}g lipídio`
+          `• ${item.name} (${item.weightGrams}g):\n  ${item.nutrients.kcal} kcal | ${item.nutrients.proteinG}g proteína | ${item.nutrients.carbG}g carboidrato | ${item.nutrients.fatG}g lipídio`
       )
       .join("\n\n");
 
@@ -445,15 +443,12 @@ export class ProcessMessageUseCase {
 
   /**
    * Extrai nutrição usando Gemini como única fonte
-   * Se falhar, retorna erro sem fallback
+   * O Gemini faz todo o parsing e retorna JSON com array de alimentos
    */
   private async extractNutritionUsingStrategy(
     messageBody: string
   ): Promise<Result<NutritionAnalysisDto, string>> {
-    // Extrair com Gemini (única fonte)
-    const geminiResult = await this.extractNutritionViaGeminiUseCase.executeForFoods(
-      this.parseMessageIntoFoods(messageBody)
-    );
+    const geminiResult = await this.extractNutritionViaGeminiUseCase.executeForMessage(messageBody);
 
     if (geminiResult.success) {
       logger.debug(
@@ -469,159 +464,6 @@ export class ProcessMessageUseCase {
     );
 
     return failure(geminiResult.error);
-  }
-
-  /**
-   * Parseia mensagem em alimentos individuais
-   * Extrai quantidade e peso de cada item
-   */
-  private parseMessageIntoFoods(
-    messageBody: string
-  ): Array<{ description: string; weightGrams: number }> {
-    // Normalizar a mensagem: remover espaços extras e normalizar separadores
-    const normalized = messageBody.trim().replace(/\s+/g, " ");
-    
-    // Separar por "e" ou "," (com ou sem espaços)
-    // Mas preservar casos como "100 de alface" (sem "g")
-    const parts = normalized.split(/\s*(?:e|,)\s*/i).filter((part) => part.trim().length > 0);
-
-    const foods: Array<{ description: string; weightGrams: number }> = [];
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i].trim();
-      
-      // Extrair peso em gramas (ex: "150g", "150 g", "150 gramas", ou apenas "150")
-      const gramsMatch = part.match(/(\d+(?:[.,]\d+)?)\s*(?:g|g\.|gramas?|grama)/i);
-      
-      let weightGrams: number | null = null;
-      let description = part;
-
-      if (gramsMatch) {
-        // Caso 1: Tem "g" ou "gramas" explícito
-        const weightStr = gramsMatch[1].replace(",", ".");
-        weightGrams = Math.round(parseFloat(weightStr));
-        
-        // Remover o peso da descrição
-        description = part
-          .replace(/(\d+(?:[.,]\d+)?)\s*(?:g|g\.|gramas?|grama)/i, "")
-          .replace(/^de\s+/i, "")
-          .trim();
-      } else {
-        // Caso 2: Apenas número no início (ex: "100 de alface" ou "150 arroz")
-        const numberMatch = part.match(/^(\d+(?:[.,]\d+)?)\s+/);
-        if (numberMatch) {
-          const weightStr = numberMatch[1].replace(",", ".");
-          weightGrams = Math.round(parseFloat(weightStr));
-          
-          // Remover o número da descrição
-          description = part
-            .replace(/^\d+(?:[.,]\d+)?\s+/, "")
-            .replace(/^de\s+/i, "")
-            .trim();
-        }
-      }
-
-      // Se não encontrou peso, tentar pegar do próximo item ou usar padrão
-      if (weightGrams === null) {
-        // Se a descrição está vazia ou é só um número, pode ser que o número esteja separado
-        // Exemplo: "150" e "de arroz" em partes separadas
-        if (!description || description.length === 0 || /^\d+$/.test(description)) {
-          // Tentar pegar o próximo item se existir
-          if (i + 1 < parts.length) {
-            const nextPart = parts[i + 1].trim();
-            const nextNumberMatch = nextPart.match(/^(\d+(?:[.,]\d+)?)/);
-            if (nextNumberMatch) {
-              const weightStr = nextNumberMatch[1].replace(",", ".");
-              weightGrams = Math.round(parseFloat(weightStr));
-              description = nextPart.replace(/^\d+(?:[.,]\d+)?\s*/, "").trim();
-              i++; // Pular o próximo item já que foi usado
-            } else {
-              // Se não tem número no próximo, usar o número atual como peso
-              const currentNumber = parseInt(description, 10);
-              if (!isNaN(currentNumber)) {
-                weightGrams = currentNumber;
-                // Tentar pegar descrição do próximo item
-                if (i + 1 < parts.length) {
-                  description = parts[i + 1].trim();
-                  i++; // Pular o próximo item
-                } else {
-                  // Se não tem próximo item, pular este
-                  logger.warn(
-                    {
-                      part,
-                      currentNumber,
-                      allParts: parts,
-                    },
-                    "Number without food name, skipping item"
-                  );
-                  continue;
-                }
-              }
-            }
-          }
-        }
-        
-        // Se ainda não tem peso, usar padrão de 100g
-        if (weightGrams === null) {
-          weightGrams = 100;
-        }
-      }
-
-      // Se a descrição está vazia ou é inválida, pular este item
-      if (!description || description.length === 0 || description === "de" || /^\d+$/.test(description)) {
-        logger.warn(
-          {
-            originalPart: part,
-            description,
-            weightGrams,
-            allParts: parts,
-          },
-          "Skipping invalid food item (empty or invalid description)"
-        );
-        continue;
-      }
-
-      const result = {
-        description: description,
-        weightGrams: Math.max(1, Math.min(5000, weightGrams)), // Limitar entre 1g e 5000g
-      };
-
-      logger.debug(
-        {
-          originalPart: part,
-          extractedDescription: result.description,
-          extractedWeight: result.weightGrams,
-          partIndex: i,
-        },
-        "Parsed food item from message"
-      );
-
-      foods.push(result);
-    }
-
-    logger.debug(
-      {
-        originalMessage: messageBody,
-        parsedFoods: foods,
-        totalItems: foods.length,
-      },
-      "Parsed message into foods"
-    );
-
-    // Validar que temos pelo menos um alimento válido
-    if (foods.length === 0) {
-      logger.warn(
-        { originalMessage: messageBody },
-        "No valid foods parsed from message"
-      );
-      // Retornar a mensagem original como um único alimento com peso padrão
-      return [{
-        description: messageBody.trim(),
-        weightGrams: 100,
-      }];
-    }
-
-    return foods;
   }
 }
 
