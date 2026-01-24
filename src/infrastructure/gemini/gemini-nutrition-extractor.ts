@@ -32,6 +32,9 @@ export class GeminiNutritionExtractor {
     this.cache = cache;
   }
 
+  /**
+   * Extrai dados nutricionais de uma descrição de alimento
+   */
   async extract(foodDescription: string, weightGrams: number): Promise<NutritionExtractionResult> {
     const cachedData = this.cache.get(foodDescription, weightGrams);
     if (cachedData) {
@@ -77,6 +80,9 @@ export class GeminiNutritionExtractor {
     return validationResult;
   }
 
+  /**
+   * Faz chamada ao Gemini para extrair nutrição
+   */
   private async callGemini(
     foodDescription: string,
     weightGrams: number
@@ -98,6 +104,9 @@ export class GeminiNutritionExtractor {
     }
   }
 
+  /**
+   * Constrói prompt otimizado para Gemini
+   */
   private buildExtractionPrompt(foodDescription: string, weightGrams: number): string {
     return `Você é um mecanismo determinístico de análise nutricional.
 Criatividade é estritamente proibida.
@@ -105,103 +114,61 @@ Criatividade é estritamente proibida.
 Seu único objetivo é retornar dados nutricionais matematicamente corretos, consistentes e verificáveis.
 
 Se qualquer informação necessária não estiver explicitamente definida, você deve:
+1. Usar valores médios conservadores amplamente aceitos, OU
+2. Reduzir o nível de "confidence"
 
-usar valores médios conservadores amplamente aceitos, OU
+PROIBIÇÕES ABSOLUTAS:
+- Você NÃO PODE inferir método de preparo não especificado.
+- Você NÃO PODE assumir ingredientes, óleo, manteiga ou condimentos extras.
+- Você NÃO PODE extrapolar dados regionais ou marcas sem base.
+- Você NÃO PODE retornar "confidence": "alta" sem preparo explícito.
+- Você NÃO PODE ignorar regras matemáticas.
+- Você NÃO PODE retornar texto fora do JSON.
 
-reduzir o nível de "confidence"
-
-PROIBIÇÕES ABSOLUTAS
-
-Você NÃO PODE:
-
-inferir método de preparo não especificado
-
-assumir ingredientes, óleo, manteiga ou condimentos
-
-extrapolar dados regionais ou marcas
-
-usar valores "típicos" sem base consolidada
-
-retornar "confidence": "alta" sem preparo explícito
-
-ignorar ou contornar regras matemáticas
-
-retornar texto fora de JSON
-
-retornar JSON inválido ou incompleto
-
-REGRAS MATEMÁTICAS (INQUEBRÁVEIS)
-
-Use exclusivamente:
-
-Carboidratos: 4 kcal por grama
-
-Proteínas: 4 kcal por grama
-
-Gorduras: 9 kcal por grama
-
-Calorias totais DEVEM ser calculadas como:
-
-(calorias) = (carbs_g × 4) + (protein_g × 4) + (fat_g × 9)
-
-A diferença entre:
-
-calorias calculadas
-
-campo "calories"
-
-NÃO pode exceder 5%.
-
-Se houver inconsistência:
-➡️ ajuste os macronutrientes, nunca ignore a matemática.
-
-FORMATO DE SAÍDA (OBRIGATÓRIO)
-
-Retorne APENAS um JSON válido
-
-Sem markdown
-
-Sem explicações
-
-Sem comentários
-
-Sem texto adicional
-
-Campos obrigatórios sempre presentes
-
-"calories": número inteiro
-
-Macronutrientes: máximo 1 casa decimal
-
-Estrutura fixa (campos obrigatórios):
-{
-"food_name": "string",
-"weight_grams": número,
-"calories": número inteiro,
-"protein_g": número (até 1 casa decimal),
-"carbs_g": número (até 1 casa decimal),
-"fat_g": número (até 1 casa decimal),
-"confidence": "alta" | "média" | "baixa"
-}
-
-Campos opcionais (inclua apenas se relevante):
-"fiber_g": número (até 1 casa decimal)
-"notes": "string"
-
-Se fibra não for relevante ou confiável, omita fiber_g.
-Se não houver observações, omita notes.
+REGRAS MATEMÁTICAS (INQUEBRÁVEIS):
+- Carboidratos: 4 kcal por grama
+- Proteínas: 4 kcal por grama
+- Gorduras: 9 kcal por grama
+- Calorias totais DEVEM ser calculadas como: (carbs_g × 4) + (protein_g × 4) + (fat_g × 9)
+- A diferença entre as calorias calculadas e o campo "calories" NÃO pode exceder 5%.
+- Se houver inconsistência, ajuste os macronutrientes para refletir a realidade física do alimento.
 
 Alimento: "${foodDescription}"
 Peso: ${weightGrams}g
 
+FORMATO DE SAÍDA (OBRIGATÓRIO - APENAS JSON):
+{
+  "food_name": "nome padronizado",
+  "weight_grams": ${weightGrams},
+  "calories": número inteiro,
+  "protein_g": número (máx 1 casa decimal),
+  "carbs_g": número (máx 1 casa decimal),
+  "fat_g": número (máx 1 casa decimal),
+  "fiber_g": número (máx 1 casa decimal, opcional),
+  "confidence": "alta" | "média" | "baixa",
+  "notes": "explicação lógica breve"
+}
+
+Regras de Lógica:
+1. Se o alimento é vago (ex: "frango"): Use valores para "Frango, peito, cozido" (padrão conservador) e marque confidence "média".
+2. Se o preparo é explícito (ex: "frango frito"): Use valores específicos e marque confidence "alta".
+3. Se fibra não for relevante ou confiável, omita fiber_g.
+
 VALORES DE REFERÊNCIA (por 100g):
 - Arroz branco cozido: ~130 kcal, 2.3g proteína, 28g carboidrato, 0.2g gordura
 - Batata cozida: ~75 kcal, 1.5g proteína, 17g carboidrato, 0.1g gordura
-- Alface: ~15 kcal, 1.2g proteína, 2.5g carboidrato, 0.2g gordura`;
+- Alface: ~15 kcal, 1.2g proteína, 2.5g carboidrato, 0.2g gordura
+
+Exemplo de resposta válida:
+{"food_name":"Arroz branco cozido","weight_grams":150,"calories":195,"protein_g":3.5,"carbs_g":42.0,"fat_g":0.3,"confidence":"alta","notes":"Valores para arroz branco cozido"}`;
   }
 
+  /**
+   * Parseia resposta JSON do Gemini
+   */
   private parseGeminiResponse(responseText: string): GeminiNutritionResponse {
     try {
+      // Remover markdown code blocks se presente
       const cleaned = responseText
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
@@ -209,10 +176,12 @@ VALORES DE REFERÊNCIA (por 100g):
 
       const parsed = JSON.parse(cleaned) as GeminiNutritionResponse;
 
+      // Validar estrutura básica
       if (!parsed.food_name || typeof parsed.calories !== "number") {
         throw new Error("Response missing required fields");
       }
 
+      // Validar que food_name não está vazio ou é inválido
       const foodName = parsed.food_name.trim();
       if (foodName.length === 0 || 
           foodName.toLowerCase().includes("não especificado") ||
