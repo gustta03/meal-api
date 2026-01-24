@@ -8,8 +8,8 @@ export const CONFIG = {
     DEFAULT_DB_NAME: "bot-nutri",
   },
   GEMINI: {
-    DEFAULT_MODEL: "gemini-2.0-flash",
-    VISION_MODEL: "gemini-2.0-flash",
+    DEFAULT_MODEL: "gemini-2.5-flash-lite",
+    VISION_MODEL: "gemini-2.5-flash-lite",
     DEFAULT_TEMPERATURE: 0.7,
     DEFAULT_MAX_TOKENS: 2048,
   },

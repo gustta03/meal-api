@@ -127,6 +127,19 @@ export class WhapiWhatsAppRepository implements IWhatsAppRepository {
       return;
     }
 
+    // Ignorar mensagens enviadas pelo próprio bot
+    if (whapiMessage.from_me === true) {
+      logger.debug(
+        {
+          messageId: whapiMessage.id,
+          messageType: whapiMessage.type,
+          from: whapiMessage.from,
+        },
+        "Ignoring message from bot itself"
+      );
+      return;
+    }
+
     try {
       logger.debug(
         {

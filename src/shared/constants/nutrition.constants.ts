@@ -4,6 +4,20 @@ export const NUTRITION = {
   MIN_CARBS: 0,
   MIN_FAT: 0,
   MIN_WEIGHT_GRAMS: 0,
+  MAX_REASONABLE_CALORIES: 10000,
+  MAX_REASONABLE_MACROS: 500,
+} as const;
+
+export const NUTRITION_CONFIDENCE = {
+  HIGH: "alta",
+  MEDIUM: "média",
+  LOW: "baixa",
+} as const;
+
+export const NUTRITION_SOURCE = {
+  GEMINI: "gemini",
+  CACHE: "cache",
+  DATABASE: "database",
 } as const;
 
 export const UNIT_CONVERSIONS = {

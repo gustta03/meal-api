@@ -1,6 +1,7 @@
 import { Message } from "@domain/entities/message.entity";
 import { Result, success, failure } from "@shared/types/result";
 import { AnalyzeNutritionUseCase } from "./analyze-nutrition.use-case";
+import { ExtractNutritionViaGeminiUseCase } from "./extract-nutrition-via-gemini.use-case";
 import { SaveMealUseCase } from "./save-meal.use-case";
 import { GetDailySummaryUseCase } from "./get-daily-summary.use-case";
 import { GenerateWeeklyReportUseCase } from "./generate-weekly-report.use-case";
@@ -27,6 +28,7 @@ export interface ProcessMessageResult {
 export class ProcessMessageUseCase {
   constructor(
     private readonly analyzeNutritionUseCase: AnalyzeNutritionUseCase,
+    private readonly extractNutritionViaGeminiUseCase: ExtractNutritionViaGeminiUseCase,
     private readonly saveMealUseCase: SaveMealUseCase,
     private readonly getDailySummaryUseCase: GetDailySummaryUseCase,
     private readonly generateWeeklyReportUseCase: GenerateWeeklyReportUseCase,
@@ -183,7 +185,7 @@ export class ProcessMessageUseCase {
       return this.getWeeklyReport(message.from);
     }
 
-    const nutritionResult = await this.analyzeNutritionUseCase.executeFromText(messageBody);
+    const nutritionResult = await this.extractNutritionUsingStrategy(messageBody);
 
     if (!nutritionResult.success) {
       if (onboardingStatus.success && onboardingStatus.data.currentStep === "practicing") {
@@ -456,6 +458,60 @@ export class ProcessMessageUseCase {
     }
     
     return "other";
+  }
+
+  /**
+   * Extrai nutrição usando Gemini como única fonte
+   * Se falhar, retorna erro sem fallback
+   */
+  private async extractNutritionUsingStrategy(
+    messageBody: string
+  ): Promise<Result<NutritionAnalysisDto, string>> {
+    // Extrair com Gemini (única fonte)
+    const geminiResult = await this.extractNutritionViaGeminiUseCase.executeForFoods(
+      this.parseMessageIntoFoods(messageBody)
+    );
+
+    if (geminiResult.success) {
+      logger.debug(
+        { messageLength: messageBody.length },
+        "Nutrition extracted successfully via Gemini"
+      );
+      return geminiResult;
+    }
+
+    logger.error(
+      { geminiError: geminiResult.error },
+      "Failed to extract nutrition via Gemini"
+    );
+
+    return failure(geminiResult.error);
+  }
+
+  /**
+   * Parseia mensagem em alimentos individuais
+   * Extrai quantidade e peso de cada item
+   */
+  private parseMessageIntoFoods(
+    messageBody: string
+  ): Array<{ description: string; weightGrams: number }> {
+    // Separar por "e" ou ","
+    const parts = messageBody.split(/\s+(?:e|,)\s+/i);
+
+    const foods = parts.map((part: string) => {
+      const trimmed = part.trim();
+      
+      // Tentar extrair peso em gramas (ex: "150g", "1 xícara")
+      const gramsMatch = trimmed.match(/(\d+)\s*g(?:ramas?)?/i);
+      const weightGrams = gramsMatch ? parseInt(gramsMatch[1], 10) : 100; // Padrão 100g
+
+      return {
+        description: trimmed,
+        weightGrams: Math.max(1, Math.min(5000, weightGrams)), // Limitar entre 1g e 5000g
+      };
+    });
+
+    return foods;
   }
 }
 

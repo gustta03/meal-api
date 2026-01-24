@@ -15,9 +15,9 @@ interface GeminiTextResponse {
 }
 
 export class GeminiService {
-  private genAI: GoogleGenerativeAI;
-  private model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
-  private visionModel: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
+  private readonly genAI: GoogleGenerativeAI;
+  readonly model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
+  readonly visionModel: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;

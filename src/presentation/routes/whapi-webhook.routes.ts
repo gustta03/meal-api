@@ -1,7 +1,7 @@
 import { Elysia } from "elysia";
 import { getSharedWhatsAppRepository } from "../../infrastructure/whatsapp/whatsapp.service";
 import { logger } from "@shared/logger/logger";
-import { WhapiWebhookPayload, WhapiMessage } from "../../infrastructure/whapi/types/whapi.types";
+import { WhapiMessage } from "../../infrastructure/whapi/types/whapi.types";
 import { WhapiWhatsAppRepository } from "../../infrastructure/whapi/whapi-whatsapp.repository";
 
 export function createWhapiWebhookRoutes() {
