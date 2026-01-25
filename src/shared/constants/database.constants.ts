@@ -20,5 +20,8 @@ export const DATABASE = {
     RETRY_READS: true,
     RETRY_WRITES: true,
   },
+  IMPORT: {
+    BATCH_SIZE: 25,
+  },
 } as const;
 

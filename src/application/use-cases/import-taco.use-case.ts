@@ -136,13 +136,24 @@ export class ImportTacoUseCase {
         }
       }
       
-      logger.info({ totalDocuments: documents.length }, "Inserting documents into MongoDB...");
+      logger.info({ totalDocuments: documents.length }, "Inserting documents into MongoDB in batches...");
       
       if (documents.length === 0) {
         return failure("Nenhum documento válido encontrado no arquivo Excel");
       }
       
-      await collection.insertMany(documents);
+      const BATCH_SIZE = DATABASE.IMPORT.BATCH_SIZE;
+      let totalImported = 0;
+      
+      for (let i = 0; i < documents.length; i += BATCH_SIZE) {
+        const batch = documents.slice(i, i + BATCH_SIZE);
+        await collection.insertMany(batch, { ordered: false });
+        totalImported += batch.length;
+        
+        if (totalImported % 500 === 0 || totalImported === documents.length) {
+          logger.info({ imported: totalImported, total: documents.length }, "Batch insert progress...");
+        }
+      }
       
       logger.info("Creating indexes...");
       await collection.createIndex({ nome: "text", searchableText: "text" });
@@ -151,13 +162,13 @@ export class ImportTacoUseCase {
       
       logger.info(
         {
-          totalImported: documents.length,
+          totalImported,
           collection: DATABASE.COLLECTIONS.TACO_ITEMS,
         },
         "TACO data imported successfully"
       );
       
-      return success({ imported: documents.length });
+      return success({ imported: totalImported });
     } catch (error) {
       logger.error({ error }, "Failed to import TACO data");
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
